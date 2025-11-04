@@ -1,7 +1,14 @@
 [project]
 name = "text-translation-service"
 version = "0.1.0"
-description = "Add your description here"
+description = "SRT translation service using OpenRouter Claude Sonnet 4.5"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.121.0",
+    "uvicorn[standard]>=0.38.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.12.3",
+    "python-dotenv>=1.2.1",
+    "pysubs2>=1.7.0",
+]
