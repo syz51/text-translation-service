@@ -166,7 +166,7 @@ async def translate_batch(
     target_language: str,
     source_language: Optional[str] = None,
     model: str = DEFAULT_MODEL,
-    max_concurrent: int = 100,
+    max_concurrent: int = 25,
     country: Optional[str] = None,
 ) -> list[str]:
     """Translate multiple texts concurrently.
