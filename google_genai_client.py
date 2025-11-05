@@ -1,6 +1,8 @@
 """Google GenAI client for text translation using Gemini models with thinking enabled."""
 
 import os
+import re
+import uuid
 from typing import Optional
 from google import genai
 from google.genai import types
@@ -214,10 +216,15 @@ async def translate_text_chunk(
             "Please set it in .env file or environment variables."
         )
 
-    # Format multiple entries with delimiters
+    # Generate unique session ID to prevent delimiter collision
+    session_id = uuid.uuid4().hex[:8]
+
+    # Format multiple entries with unique delimiters
     formatted_entries = []
     for i, text in enumerate(texts, start=1):
-        formatted_entries.append(f"[ENTRY_{i}]\n{text}\n[/ENTRY_{i}]")
+        formatted_entries.append(
+            f"[ENTRY_{i}_{session_id}]\n{text}\n[/ENTRY_{i}_{session_id}]"
+        )
 
     combined_text = "\n\n".join(formatted_entries)
 
@@ -270,14 +277,14 @@ Step 6: Final Translation
 - Address all identified issues
 
 CRITICAL OUTPUT FORMAT:
-You MUST output exactly {len(texts)} entries using the same delimiters:
-[ENTRY_1]
+You MUST output exactly {len(texts)} entries using the EXACT same delimiters:
+[ENTRY_1_{session_id}]
 translated text for entry 1
-[/ENTRY_1]
+[/ENTRY_1_{session_id}]
 
-[ENTRY_2]
+[ENTRY_2_{session_id}]
 translated text for entry 2
-[/ENTRY_2]
+[/ENTRY_2_{session_id}]
 
 ...and so on. Output ONLY the delimited entries. No explanations, labels, or extra text. Preserve line breaks within entries exactly."""
 
@@ -312,21 +319,94 @@ translated text for entry 2
 
         translated_text = "".join(translated_parts).strip()
 
-        # Parse out individual entries
-        import re
+        # Parse out individual entries with robust error handling
+        matches_with_pos = []
+        missing_entries = []
+        duplicate_entries = []
 
-        parsed_entries = []
         for i in range(1, len(texts) + 1):
-            pattern = rf"\[ENTRY_{i}\](.*?)\[/ENTRY_{i}\]"
-            match = re.search(pattern, translated_text, re.DOTALL)
-            if match:
-                parsed_entries.append(match.group(1).strip())
+            # Try exact match with session_id first (case-insensitive, whitespace tolerant)
+            pattern = rf"\[\s*ENTRY_{i}_{session_id}\s*\](.*?)\[\s*/ENTRY_{i}_{session_id}\s*\]"
+            matches = list(
+                re.finditer(pattern, translated_text, re.DOTALL | re.IGNORECASE)
+            )
+
+            if len(matches) > 1:
+                # Multiple matches found for same entry - this is a duplicate
+                duplicate_entries.append(i)
+                # Use first match but flag the issue
+                content = matches[0].group(1)
+                matches_with_pos.append((i, matches[0].start(), content))
+            elif len(matches) == 1:
+                content = matches[0].group(1)
+                matches_with_pos.append((i, matches[0].start(), content))
             else:
-                raise GoogleGenAIError(f"Failed to parse ENTRY_{i} from response")
+                # Fallback: try without session_id (in case LLM didn't copy it exactly)
+                fallback_pattern = rf"\[\s*ENTRY_{i}(?:_[a-f0-9]{{8}})?\s*\](.*?)\[\s*/ENTRY_{i}(?:_[a-f0-9]{{8}})?\s*\]"
+                fallback_matches = list(
+                    re.finditer(
+                        fallback_pattern, translated_text, re.DOTALL | re.IGNORECASE
+                    )
+                )
+
+                if len(fallback_matches) > 1:
+                    duplicate_entries.append(i)
+                    content = fallback_matches[0].group(1)
+                    matches_with_pos.append((i, fallback_matches[0].start(), content))
+                elif len(fallback_matches) == 1:
+                    content = fallback_matches[0].group(1)
+                    matches_with_pos.append((i, fallback_matches[0].start(), content))
+                else:
+                    missing_entries.append(i)
+
+        # Report detailed error if parsing failed
+        if missing_entries:
+            error_msg = f"Failed to parse entries: {missing_entries}. "
+            error_msg += f"Response preview: {translated_text[:500]}..."
+            raise GoogleGenAIError(error_msg)
+
+        # Warn about duplicates (but continue with first match)
+        if duplicate_entries:
+            error_msg = f"Duplicate entries detected: {duplicate_entries}. Using first occurrence. "
+            error_msg += f"Response preview: {translated_text[:500]}..."
+            raise GoogleGenAIError(error_msg)
+
+        # Check entries are in correct sequential order
+        sorted_matches = sorted(matches_with_pos, key=lambda x: x[1])
+        expected_order = list(range(1, len(texts) + 1))
+        actual_order = [m[0] for m in sorted_matches]
+
+        if actual_order != expected_order:
+            raise GoogleGenAIError(
+                f"Entries are reordered in response. Expected: {expected_order}, Got: {actual_order}"
+            )
+
+        # Extract content in correct order
+        parsed_entries = []
+        for entry_num, _, content in sorted_matches:
+            # Preserve whitespace but normalize excessive leading/trailing newlines
+            # Only strip multiple leading/trailing newlines, preserve single spaces/newlines
+            normalized = content
+
+            # Remove excessive leading/trailing newlines (more than 1)
+            while normalized.startswith("\n\n"):
+                normalized = normalized[1:]
+            while normalized.endswith("\n\n"):
+                normalized = normalized[:-1]
+
+            # Validate no unescaped delimiters inside content (nested collision check)
+            delimiter_check = r"\[\s*(?:/)?ENTRY_\d+(?:_[a-f0-9]{8})?\s*\]"
+            if re.search(delimiter_check, normalized, re.IGNORECASE):
+                raise GoogleGenAIError(
+                    f"Entry {entry_num} contains delimiter-like content: {normalized[:100]}..."
+                )
+
+            parsed_entries.append(normalized)
 
         if len(parsed_entries) != len(texts):
             raise GoogleGenAIError(
-                f"Expected {len(texts)} entries, got {len(parsed_entries)}"
+                f"Expected {len(texts)} entries, got {len(parsed_entries)}. "
+                f"Missing: {len(texts) - len(parsed_entries)}"
             )
 
         return parsed_entries
