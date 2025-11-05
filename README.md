@@ -124,6 +124,7 @@ curl -X POST http://localhost:8000/translate \
 **Translation process:**
 
 The service groups consecutive subtitle entries (default: 8) for better context, then uses a 6-step reasoning process with extended thinking:
+
 1. Context analysis (dialogue flow, text type, domain, cultural elements)
 2. Translation challenges (idioms, cultural adaptation, consistency across entries)
 3. Subtitle constraints (conciseness, line breaks, reading speed)
@@ -132,6 +133,7 @@ The service groups consecutive subtitle entries (default: 8) for better context,
 6. Final improved translation
 
 **Benefits of chunking:**
+
 - Better context: Translator sees dialogue flow and narrative continuity
 - Improved consistency: Character names, terms, and tone maintained across entries
 - Natural dialogue: Responses/reactions translated with awareness of preceding lines
