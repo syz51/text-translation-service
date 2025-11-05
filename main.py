@@ -1,6 +1,7 @@
 """FastAPI service for translating SRT subtitle files using OpenRouter."""
 
 import os
+import logging
 from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -9,6 +10,11 @@ from dotenv import load_dotenv
 
 from srt_parser import parse_srt, reconstruct_srt, extract_texts, update_texts
 from google_genai_client import translate_batch, GoogleGenAIError
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 # Load environment variables
 load_dotenv()
@@ -83,10 +89,8 @@ class TranslationRequest(BaseModel):
         description="Optional Google GenAI model override (default: gemini-2.5-pro)",
     )
     chunk_size: Optional[int] = Field(
-        8,
-        description="Number of consecutive entries to translate together (default: 8, range: 1-20)",
-        ge=1,
-        le=20,
+        100,
+        description="Number of consecutive entries to translate together (default: 100)",
     )
 
 

@@ -3,10 +3,14 @@
 import os
 import re
 import uuid
+import logging
 from typing import Optional
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -102,11 +106,11 @@ Step 6: Final Translation
 CRITICAL: Output ONLY the final translated text. No explanations, labels, or extra formatting. Preserve line breaks exactly."""
 
     try:
-        # Initialize client
+        # Initialize client with async support
         client = genai.Client(api_key=GOOGLE_API_KEY)
 
-        # Generate content with thinking enabled
-        response = client.models.generate_content(
+        # Generate content with thinking enabled (native async)
+        response = await client.aio.models.generate_content(
             model=model,
             contents=user_prompt,
             config=types.GenerateContentConfig(
@@ -145,7 +149,7 @@ async def translate_batch(
     model: str = DEFAULT_MODEL,
     max_concurrent: int = 25,
     country: Optional[str] = None,
-    chunk_size: int = 8,
+    chunk_size: int = 100,
 ) -> list[str]:
     """Translate multiple texts in chunks for better context.
 
@@ -156,7 +160,7 @@ async def translate_batch(
         model: Google GenAI model ID
         max_concurrent: Maximum number of concurrent requests
         country: Optional target country/region for localization
-        chunk_size: Number of entries to group together (default: 8)
+        chunk_size: Number of entries to group together (default: 100)
 
     Returns:
         List of translated texts in same order as input
@@ -166,21 +170,54 @@ async def translate_batch(
     """
     import asyncio
 
+    # Group texts into chunks
+    chunks = [texts[i : i + chunk_size] for i in range(0, len(texts), chunk_size)]
+    total_chunks = len(chunks)
+
+    logger.info(
+        f"Starting translation: {len(texts)} entries -> {total_chunks} chunks "
+        f"(chunk_size={chunk_size}, max_concurrent={max_concurrent})"
+    )
+
+    # Track completed chunks
+    completed_chunks = 0
+    completed_lock = asyncio.Lock()
+
     # Create semaphore to limit concurrent requests
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    async def translate_chunk_with_semaphore(chunk: list[str]) -> list[str]:
+    async def translate_chunk_with_semaphore(
+        chunk_idx: int, chunk: list[str]
+    ) -> list[str]:
+        nonlocal completed_chunks
         async with semaphore:
-            return await translate_text_chunk(
-                chunk, target_language, source_language, model, country=country
+            chunk_start_idx = chunk_idx * chunk_size + 1
+            chunk_end_idx = chunk_start_idx + len(chunk) - 1
+
+            result = await translate_text_chunk(
+                chunk,
+                target_language,
+                source_language,
+                model,
+                country=country,
+                chunk_idx=chunk_idx + 1,
+                total_chunks=total_chunks,
             )
 
-    # Group texts into chunks
-    chunks = [texts[i : i + chunk_size] for i in range(0, len(texts), chunk_size)]
+            async with completed_lock:
+                completed_chunks += 1
+                logger.info(
+                    f"Chunk {completed_chunks}/{total_chunks} complete "
+                    f"(entries {chunk_start_idx}-{chunk_end_idx})"
+                )
+
+            return result
 
     # Execute chunk translations concurrently
-    tasks = [translate_chunk_with_semaphore(chunk) for chunk in chunks]
+    tasks = [translate_chunk_with_semaphore(i, chunk) for i, chunk in enumerate(chunks)]
     translated_chunks = await asyncio.gather(*tasks)
+
+    logger.info(f"Translation complete: {len(texts)} entries translated")
 
     # Flatten results
     return [text for chunk in translated_chunks for text in chunk]
@@ -193,6 +230,8 @@ async def translate_text_chunk(
     model: str = DEFAULT_MODEL,
     # timeout: float = 300.0,
     country: Optional[str] = None,
+    chunk_idx: Optional[int] = None,
+    total_chunks: Optional[int] = None,
 ) -> list[str]:
     """Translate chunk of subtitle entries together for better context.
 
@@ -203,6 +242,8 @@ async def translate_text_chunk(
         model: Google GenAI model ID
         timeout: Request timeout in seconds
         country: Optional target country/region for localization
+        chunk_idx: Optional chunk index for logging
+        total_chunks: Optional total chunks for logging
 
     Returns:
         List of translated texts in same order
@@ -214,6 +255,12 @@ async def translate_text_chunk(
         raise ValueError(
             "GOOGLE_API_KEY not found in environment. "
             "Please set it in .env file or environment variables."
+        )
+
+    # Log chunk processing start
+    if chunk_idx and total_chunks:
+        logger.info(
+            f"Processing chunk {chunk_idx}/{total_chunks} ({len(texts)} entries)"
         )
 
     # Generate unique session ID to prevent delimiter collision
@@ -289,11 +336,11 @@ translated text for entry 2
 ...and so on. Output ONLY the delimited entries. No explanations, labels, or extra text. Preserve line breaks within entries exactly."""
 
     try:
-        # Initialize client
+        # Initialize client with async support
         client = genai.Client(api_key=GOOGLE_API_KEY)
 
-        # Generate content with thinking enabled
-        response = client.models.generate_content(
+        # Generate content with thinking enabled (native async)
+        response = await client.aio.models.generate_content(
             model=model,
             contents=user_prompt,
             config=types.GenerateContentConfig(
