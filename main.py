@@ -8,7 +8,7 @@ from typing import Optional
 from dotenv import load_dotenv
 
 from srt_parser import parse_srt, reconstruct_srt, extract_texts, update_texts
-from openrouter_client import translate_batch, OpenRouterError
+from google_genai_client import translate_batch, GoogleGenAIError
 
 # Load environment variables
 load_dotenv()
@@ -19,7 +19,7 @@ SERVICE_API_KEY = os.getenv("API_KEY")
 # Initialize FastAPI app
 app = FastAPI(
     title="Text Translation Service",
-    description="Translate SRT subtitle files using OpenRouter's Claude models",
+    description="Translate SRT subtitle files using Google GenAI (Gemini 2.5 Pro)",
     version="0.1.0",
 )
 
@@ -80,7 +80,13 @@ class TranslationRequest(BaseModel):
     )
     model: Optional[str] = Field(
         None,
-        description="Optional OpenRouter model override (default: anthropic/claude-sonnet-4)",
+        description="Optional Google GenAI model override (default: gemini-2.5-pro)",
+    )
+    chunk_size: Optional[int] = Field(
+        8,
+        description="Number of consecutive entries to translate together (default: 8, range: 1-20)",
+        ge=1,
+        le=20,
     )
 
 
@@ -141,11 +147,12 @@ async def translate_srt(request: TranslationRequest):
             "target_language": request.target_language,
             "source_language": request.source_language,
             "country": request.country,
+            "chunk_size": request.chunk_size,
         }
         if request.model:
             translate_params["model"] = request.model
 
-        # Translate all texts concurrently
+        # Translate texts in chunks for better context
         translated_texts = await translate_batch(texts, **translate_params)
 
         # Update entries with translated texts
@@ -164,8 +171,8 @@ async def translate_srt(request: TranslationRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid SRT format: {str(e)}",
         )
-    except OpenRouterError as e:
-        # OpenRouter API errors
+    except GoogleGenAIError as e:
+        # Google GenAI API errors
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Translation service error: {str(e)}",

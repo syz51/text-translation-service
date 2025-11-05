@@ -1,7 +1,7 @@
 [project]
 name = "text-translation-service"
 version = "0.1.0"
-description = "SRT translation service using OpenRouter Claude Sonnet 4.5"
+description = "SRT translation service using Google GenAI (Gemini 2.5 Pro)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -11,4 +11,5 @@ dependencies = [
     "pydantic>=2.12.3",
     "python-dotenv>=1.2.1",
     "pysubs2>=1.7.0",
+    "google-genai>=1.48.0",
 ]

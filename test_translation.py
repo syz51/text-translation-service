@@ -3,7 +3,7 @@
 import asyncio
 from pathlib import Path
 from srt_parser import parse_srt, extract_texts, update_texts, reconstruct_srt
-from openrouter_client import translate_batch
+from google_genai_client import translate_batch
 
 
 async def main():
@@ -32,11 +32,25 @@ async def main():
         target_language = "Spanish"
         print(f"Using default: {target_language}")
 
-    print(f"\nTranslating to {target_language}...")
+    chunk_size_input = input(
+        "\nChunk size (entries per request, 1-20, default 8): "
+    ).strip()
+    chunk_size = 8
+    if chunk_size_input:
+        try:
+            chunk_size = max(1, min(20, int(chunk_size_input)))
+        except ValueError:
+            pass
+    print(f"Using chunk size: {chunk_size}")
+
+    print(
+        f"\nTranslating to {target_language} (grouping {chunk_size} entries per request)..."
+    )
     translated_texts = await translate_batch(
         texts,
         target_language=target_language,
         max_concurrent=3,  # Limit concurrent requests
+        chunk_size=chunk_size,
     )
 
     print("\nFirst 3 entries (translated):")
