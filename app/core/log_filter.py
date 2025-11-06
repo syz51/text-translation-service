@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Pattern
+from re import Pattern
 
 
 class SensitiveDataFilter(logging.Filter):
@@ -70,7 +70,9 @@ class SensitiveDataFilter(logging.Filter):
             ),
             # Standalone API keys with common prefixes (sk_, AIza, etc.)
             (
-                re.compile(r"\b(sk_[a-z]+_[A-Za-z0-9]{15,}|AIza[A-Za-z0-9_\-]{15,})\b", re.IGNORECASE),
+                re.compile(
+                    r"\b(sk_[a-z]+_[A-Za-z0-9]{15,}|AIza[A-Za-z0-9_\-]{15,})\b", re.IGNORECASE
+                ),
                 r"***REDACTED***",
             ),
             # Generic long alphanumeric strings that look like secrets (32+ chars)

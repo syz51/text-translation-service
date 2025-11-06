@@ -91,9 +91,14 @@ async def create_transcription_job(
     # 3. Validate file size (read file to check size)
     file_size = 0
     try:
-        # Move to end to get size
-        await file.seek(0, 2)
-        file_size = await file.tell()
+        # Read file in chunks to get size without loading all into memory
+        chunk_size = 8192
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            file_size += len(chunk)
+
         # Reset to beginning for upload
         await file.seek(0)
 
@@ -108,6 +113,8 @@ async def create_transcription_job(
                     f"({settings.max_file_size:,} bytes / 1GB)"
                 ),
             )
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error("Error checking file size: %s", e)
         raise HTTPException(status_code=500, detail="Error processing file upload")
@@ -143,9 +150,12 @@ async def create_transcription_job(
         logger.info("Uploaded audio to S3: %s", audio_s3_key)
 
         # Update job with S3 key using CRUD function
-        job = await crud.update_job_status(
+        updated_job = await crud.update_job_status(
             session, job_id, JobStatus.QUEUED.value, audio_s3_key=audio_s3_key
         )
+        if not updated_job:
+            raise ValueError(f"Job {job_id} not found after S3 upload")
+        job = updated_job
 
     except Exception as e:
         logger.error("Error uploading to S3: %s", e)
@@ -347,6 +357,10 @@ async def assemblyai_webhook(
         HTTPException: 401 (invalid token), 404 (job not found)
     """
     # 1. Validate secret token using constant-time comparison to prevent timing attacks
+    if not settings.webhook_secret_token:
+        logger.error("Webhook secret token not configured")
+        raise HTTPException(status_code=500, detail="Webhook not configured")
+
     if not secrets.compare_digest(secret_token, settings.webhook_secret_token):
         logger.warning("Invalid webhook secret token received")
         raise HTTPException(status_code=401, detail="Invalid webhook token")

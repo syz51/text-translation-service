@@ -104,7 +104,9 @@ class TestSensitiveDataFilter:
 
     def test_redact_webhook_url_with_token(self, log_filter, log_record):
         """Test redaction of webhook URL containing secret token."""
-        log_record.msg = "Webhook URL: https://api.example.com/webhooks/assemblyai/my_super_secret_token_123456"
+        log_record.msg = (
+            "Webhook URL: https://api.example.com/webhooks/assemblyai/my_super_secret_token_123456"
+        )
         log_filter.filter(log_record)
         assert "my_super_secret_token_123456" not in log_record.msg
         assert "/webhooks/assemblyai/***REDACTED***" in log_record.msg
