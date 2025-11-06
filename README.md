@@ -79,11 +79,13 @@ text-translation-service/
 1. **Clone and install dependencies:**
 
    Using uv (recommended):
+
    ```bash
    uv sync
    ```
 
    Using pip:
+
    ```bash
    pip install -e .
    ```
@@ -109,11 +111,13 @@ text-translation-service/
 ### Development Mode (Local)
 
 Using uv:
+
 ```bash
 uv run uvicorn app.main:app --reload
 ```
 
 Using Python directly:
+
 ```bash
 python -m uvicorn app.main:app --reload
 ```
@@ -261,20 +265,25 @@ ruff check app/ tests/
 All configuration is managed through environment variables (see `.env.example`):
 
 ### Required
+
 - `GOOGLE_API_KEY`: Google GenAI API key
 
 ### Optional - Environment
+
 - `ENVIRONMENT`: Environment name (default: development)
 
 ### Optional - Server
+
 - `HOST`: Server host (default: 0.0.0.0)
 - `PORT`: Server port (default: 8000)
 - `ALLOWED_HOSTS`: List of allowed hosts for production (default: ["*"])
 
 ### Optional - Authentication
+
 - `API_KEY`: Service authentication key (optional)
 
 ### Optional - CORS
+
 - `CORS_ENABLED`: Enable CORS (default: true)
 - `CORS_ORIGINS`: Allowed origins (default: ["*"])
 - `CORS_ALLOW_CREDENTIALS`: Allow credentials (default: true)
@@ -282,10 +291,12 @@ All configuration is managed through environment variables (see `.env.example`):
 - `CORS_ALLOW_HEADERS`: Allowed headers (default: ["*"])
 
 ### Optional - Translation
+
 - `DEFAULT_CHUNK_SIZE`: Translation chunk size (default: 100)
 - `MAX_CONCURRENT_REQUESTS`: Max concurrent translation requests (default: 25)
 
 ### Optional - Logging
+
 - `LOG_LEVEL`: Logging level (default: INFO)
 
 ## Error Handling
@@ -349,6 +360,7 @@ docker compose down
 ### Health Checks
 
 The service includes built-in health checks:
+
 - HTTP endpoint: `/api/v1/health`
 - Docker healthcheck: Automated container health monitoring
 
