@@ -1,6 +1,6 @@
 """Health check endpoints."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from app.core.config import settings
 from app.schemas import HealthResponse
@@ -12,10 +12,14 @@ router = APIRouter()
 
 @router.get("/", response_model=HealthResponse)
 @router.get("/health", response_model=HealthResponse)
-async def health_check():
+async def health_check(response: Response):
     """Health check endpoint with detailed component tests.
 
     Tests connectivity for all critical components: AssemblyAI, S3 storage.
+    Returns 503 status code when any component is unhealthy (degraded state).
+
+    Args:
+        response: FastAPI Response object for setting status code
 
     Returns:
         HealthResponse: Service health status with component details
@@ -39,6 +43,10 @@ async def health_check():
     # Determine overall status
     all_healthy = assemblyai_ok and s3_ok
     status = "running" if all_healthy else "degraded"
+
+    # Set 503 status code if any service is degraded
+    if not all_healthy:
+        response.status_code = 503
 
     return HealthResponse(
         service=settings.app_name,
