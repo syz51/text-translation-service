@@ -171,14 +171,11 @@ def client_no_auth(mock_service_connectivity):
 
 @pytest.fixture
 def client_with_auth(mock_service_connectivity, init_test_db):
-    """Client with API key configured."""
+    """Client with API key configured (no default headers)."""
     with patch("app.core.security.settings") as mock_settings:
         mock_settings.api_key = "test_secret_key_12345"
         app = create_app()
-        client = TestClient(app)
-        # Set default headers for all requests
-        client.headers = {"X-API-Key": "test_secret_key_12345"}
-        yield client
+        yield TestClient(app)
 
 
 def create_async_mock(return_value=None, side_effect=None):
