@@ -1,0 +1,233 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Production-grade FastAPI service for translating SRT subtitle files using Google GenAI's Gemini 2.5 Pro model, with transcription API capabilities. The service uses async/await throughout, SQLAlchemy 2.0 with async support, S3 for storage, and follows modern Python best practices.
+
+## Development Commands
+
+### Environment Setup
+
+```bash
+# Install dependencies (requires Python 3.13+)
+uv sync
+
+# Install with dev dependencies
+uv sync --all-extras
+
+# Copy environment template
+cp .env.example .env
+# Edit .env and add GOOGLE_API_KEY (get from https://aistudio.google.com/apikey)
+```
+
+### Running the Service
+
+```bash
+# Development mode (local with auto-reload)
+uv run uvicorn app.main:app --reload
+
+# Development mode (Docker)
+docker compose -f docker-compose.dev.yml up --build
+
+# Production mode (Docker)
+docker compose up -d
+
+# Production mode (local)
+python -m app.main
+```
+
+### Testing
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage report
+uv run pytest --cov=app --cov-report=html
+
+# Run specific test file
+uv run pytest tests/test_api.py
+
+# Run specific test
+uv run pytest tests/test_api.py::test_translate_srt_success
+```
+
+### Code Quality
+
+```bash
+# Format code (Black + Ruff)
+black app/ tests/
+ruff check app/ tests/ --fix
+
+# Lint code
+ruff check app/ tests/
+```
+
+### Database Migrations
+
+```bash
+# Migrations run automatically on startup, but you can manage them manually:
+
+# Create new migration
+alembic revision --autogenerate -m "description"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback one migration
+alembic downgrade -1
+
+# View migration history
+alembic history
+```
+
+## Architecture Overview
+
+### Core Design Patterns
+
+1. **Factory Pattern**: App creation in `app/main.py` via `create_app()` factory
+2. **Dependency Injection**: FastAPI's DI system for database sessions, config, and services
+3. **Middleware Stack**: CORS → GZip → TrustedHost → Authentication (in that order)
+4. **Lifespan Management**: Async context manager in `main.py` handles startup/shutdown (migrations, S3 initialization)
+5. **Settings Management**: Pydantic Settings with environment variables (see `app/core/config.py`)
+
+### Translation Service Architecture
+
+The translation service uses a sophisticated chunking strategy for better context and quality:
+
+- **Contextual Chunking** (`app/services/translation.py`): Groups consecutive SRT entries together (default: 100 entries per chunk)
+- **Multi-step Reasoning**: Uses Gemini's extended thinking mode with structured prompts (6-step process)
+- **Concurrent Processing**: Uses `asyncio.Semaphore` to limit concurrent API calls (default: 25)
+- **Delimiter-based Parsing**: Uses unique session IDs in delimiters to parse multi-entry responses
+- **Localization Support**: Optional `country` parameter for cultural adaptation
+
+Key files:
+
+- `app/services/translation.py`: Core translation logic with chunking and extended thinking
+- `app/services/srt_parser.py`: SRT parsing/reconstruction utilities
+- `app/api/v1/translation.py`: Translation endpoint
+
+### Transcription Service Architecture (In Development)
+
+The transcription service integrates with AssemblyAI for audio-to-SRT conversion:
+
+- **Async Workflow**: Upload → DB record → S3 storage → AssemblyAI → Webhook → Background processing
+- **Webhook Pattern**: AssemblyAI sends completion notification to `/webhooks/assemblyai/{secret_token}`
+- **Background Tasks**: Transcription processing happens in background to return 200 OK within 10s
+- **Presigned URLs**: S3 presigned URLs for audio upload (24h expiry) and SRT download (1h expiry)
+- **Retry Logic**: Exponential backoff with configurable retry attempts
+- **Concurrent Job Limits**: Enforced at API level (default: 10 concurrent jobs)
+
+Key files:
+
+- `app/api/v1/transcription.py`: Transcription endpoints and webhook handler
+- `app/services/assemblyai_client.py`: AssemblyAI API client wrapper
+- `app/services/transcription_service.py`: Transcription processing logic
+- `app/db/models.py`: Job status tracking (QUEUED → PROCESSING → COMPLETED/ERROR)
+- `app/storage/s3.py`: S3 wrapper with connection pooling
+
+**Important**: The transcription API requires S3 configuration and webhook setup. The service initializes S3 client during startup but allows the app to start even if S3 fails.
+
+### Database Layer
+
+- **Async SQLAlchemy 2.0**: Uses modern mapped columns and async sessions
+- **CRUD Operations**: Centralized in `app/db/crud.py` (get_job, create_job, update_job_status, etc.)
+- **Session Management**: Async context manager via `get_db()` dependency
+- **Migrations**: Alembic with auto-generation support (see `alembic/versions/`)
+
+### Storage Layer
+
+- **S3 Wrapper** (`app/storage/s3.py`): Production-grade S3 client with:
+  - Connection pooling (configurable via `S3_MAX_POOL_CONNECTIONS`)
+  - Long-lived client initialized at startup, closed at shutdown
+  - Adaptive retries (max 3 attempts)
+  - Methods: `upload_audio()`, `upload_srt()`, `generate_presigned_url()`
+  - Must call `initialize()` before use, `close()` on shutdown
+
+### Authentication
+
+- **Optional API Key**: Set `API_KEY` in `.env` to enable X-API-Key header validation
+- **Security Middleware**: `app/core/security.py` handles authentication if configured
+- **Constant-time Comparison**: Webhook secret validation uses `secrets.compare_digest()` to prevent timing attacks
+
+### API Versioning
+
+All endpoints are prefixed with `/api/v1/`:
+
+- `/api/v1/health` - Health check
+- `/api/v1/translate` - Translation endpoint
+- `/api/v1/transcriptions` - Transcription job creation
+- `/api/v1/transcriptions/{job_id}` - Job status
+- `/api/v1/transcriptions/{job_id}/srt` - SRT download (302 redirect to S3)
+- `/api/v1/webhooks/assemblyai/{secret_token}` - AssemblyAI webhook
+
+## Important Conventions
+
+### Error Handling
+
+- **Translation Service**: Raises `GoogleGenAIError` for API errors (caught as 502 Bad Gateway)
+- **Validation Errors**: Raises `ValueError` for SRT parsing errors (caught as 400 Bad Request)
+- **Transcription Service**: Returns appropriate status codes:
+  - 400: Invalid format, SRT not ready
+  - 404: Job not found
+  - 413: File too large
+  - 429: Concurrent job limit reached
+  - 500: Server errors
+
+### Logging
+
+- Structured logging via `app/core/logging.py`
+- Log levels configurable via `LOG_LEVEL` env var
+- Key events logged: chunk progress, S3 operations, job state changes, webhook events
+
+### Testing Patterns
+
+Test fixtures in `tests/conftest.py`:
+
+- `client`: Test client without auth
+- `client_with_auth`: Test client with API key
+- `mock_genai_client`: Mock Google GenAI client
+- `create_genai_response()`: Helper to create mock API responses
+- `create_async_mock()`: Helper for async function mocking
+
+**Important**: When mocking, patch where the function is IMPORTED, not where it's DEFINED (see `get_mock_target()` helper).
+
+### Configuration
+
+All configuration via environment variables (see `.env.example`):
+
+- **Required**: `GOOGLE_API_KEY`
+- **Optional Database**: `DATABASE_PATH` (default: ./data/transcriptions.db)
+- **Optional S3**: `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, etc.
+- **Optional Transcription**: `ASSEMBLYAI_API_KEY`, `WEBHOOK_BASE_URL`, `WEBHOOK_SECRET_TOKEN`
+- **Optional Server**: `HOST`, `PORT`, `ENVIRONMENT`, `ALLOWED_HOSTS`
+- **Optional Auth**: `API_KEY` (enables authentication if set)
+
+## Common Pitfalls
+
+1. **S3 Client Not Initialized**: Always ensure `s3_storage.initialize()` is called before S3 operations. The app handles this in the lifespan manager.
+
+2. **Database Sessions**: Use `Depends(get_db)` for request handlers. Background tasks must create their own sessions via `SessionLocal()` context manager.
+
+3. **Translation Chunking**: The service groups consecutive SRT entries for better context. Don't split entries individually unless there's a specific reason.
+
+4. **Webhook Response Time**: Webhook handlers MUST return 200 OK within 10 seconds. Process work in background tasks.
+
+5. **Presigned URL Expiry**: Audio URLs expire in 24h (for AssemblyAI processing), SRT URLs expire in 1h (for downloads).
+
+6. **Job Status Race Conditions**: Update job status to PROCESSING BEFORE starting AssemblyAI to prevent webhook race conditions.
+
+## Project Structure
+
+```
+app/
+├── api/v1/          # API endpoints (health, translation, transcription)
+├── core/            # Config, logging, middleware, security
+├── db/              # Database models, CRUD, session management
+├── models/          # Data models (SRT entries)
+├── schemas/         # Pydantic request/response models
+├── services/        # Business logic (translation, transcription, parsing)
+└── storage/         # S3 wrapper with connection pooling
+```

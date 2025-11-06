@@ -70,6 +70,7 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
+    enable_log_redaction: bool = True  # Redact sensitive data from logs
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"

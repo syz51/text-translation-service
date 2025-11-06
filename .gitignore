@@ -71,6 +71,7 @@ test_*.srt
 
 # Logs
 *.log
+/logs/
 
 # Cursor
 .cursor/
