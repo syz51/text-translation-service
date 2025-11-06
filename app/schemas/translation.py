@@ -50,3 +50,6 @@ class HealthResponse(BaseModel):
     components: dict[str, dict[str, str]] | None = Field(
         None, description="Status of individual service components"
     )
+    endpoints: dict[str, list[str]] | None = Field(
+        None, description="Available API endpoints organized by category"
+    )

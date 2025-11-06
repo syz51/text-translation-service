@@ -2,16 +2,35 @@
 
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from app.core.config import settings
 
 
 def setup_logging() -> None:
-    """Configure application logging."""
+    """Configure application logging with stdout and rotating file handlers."""
+    # Create logs directory
+    logs_dir = Path("./logs")
+    logs_dir.mkdir(exist_ok=True)
+
+    # Configure handlers
+    handlers = [
+        # Stdout handler for console output
+        logging.StreamHandler(sys.stdout),
+        # Rotating file handler (10MB, 5 backups)
+        RotatingFileHandler(
+            logs_dir / "app.log",
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5,
+            encoding="utf-8",
+        ),
+    ]
+
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper()),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        handlers=handlers,
     )
 
 

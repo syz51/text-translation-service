@@ -48,10 +48,26 @@ async def health_check(response: Response):
     if not all_healthy:
         response.status_code = 503
 
+    # API endpoints info
+    endpoints = {
+        "translation": [
+            "POST /api/v1/translate - Translate SRT files",
+        ],
+        "transcription": [
+            "POST /api/v1/transcriptions - Upload audio and create transcription job",
+            "GET /api/v1/transcriptions/{job_id} - Get job status",
+            "GET /api/v1/transcriptions/{job_id}/srt - Download SRT file (302 redirect)",
+        ],
+        "health": [
+            "GET /api/v1/health - Service health check with component status",
+        ],
+    }
+
     return HealthResponse(
         service=settings.app_name,
         status=status,
         version=settings.app_version,
         authentication="enabled" if settings.api_key else "disabled",
         components=components,
+        endpoints=endpoints,
     )
