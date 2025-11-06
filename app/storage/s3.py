@@ -21,7 +21,7 @@ class S3ClientNotInitializedError(Exception):
 
 class S3Storage:
     """S3 storage client with connection pooling for managing audio and SRT files.
-    
+
     This class uses a long-lived aioboto3 client with connection pooling for
     production-grade performance. The client must be initialized with initialize()
     before use and closed with close() on shutdown.
@@ -35,7 +35,7 @@ class S3Storage:
         self.region = settings.s3_region
         self.access_key = settings.s3_access_key_id
         self.secret_key = settings.s3_secret_access_key
-        
+
         # Connection pool configuration
         self.config = Config(
             max_pool_connections=settings.s3_max_pool_connections,
@@ -46,14 +46,14 @@ class S3Storage:
                 "mode": "adaptive",
             },
         )
-        
+
         # Long-lived client (initialized in initialize())
         self._client: Any = None
         self._client_context: Any = None
 
     async def initialize(self) -> bool:
         """Initialize long-lived S3 client with connection pooling.
-        
+
         Must be called before using any S3 operations. Typically called
         during application startup.
 
@@ -71,11 +71,13 @@ class S3Storage:
                 config=self.config,
             )
             self._client = await self._client_context.__aenter__()
-            
+
             # Test connectivity with HEAD bucket
             await self._client.head_bucket(Bucket=self.bucket)
-            logger.info("S3 client initialized successfully with connection pool (max_connections=%d)", 
-                       settings.s3_max_pool_connections)
+            logger.info(
+                "S3 client initialized successfully with connection pool (max_connections=%d)",
+                settings.s3_max_pool_connections,
+            )
             return True
         except ClientError as e:
             logger.error("Failed to initialize S3 client: %s", e)
@@ -87,10 +89,10 @@ class S3Storage:
             self._client = None
             self._client_context = None
             return False
-    
+
     async def close(self) -> None:
         """Close S3 client and cleanup connections.
-        
+
         Should be called during application shutdown.
         """
         if self._client_context is not None:
@@ -102,17 +104,15 @@ class S3Storage:
             finally:
                 self._client = None
                 self._client_context = None
-    
+
     def _ensure_initialized(self) -> None:
         """Ensure client is initialized before operations.
-        
+
         Raises:
             S3ClientNotInitializedError: If client not initialized
         """
         if self._client is None:
-            raise S3ClientNotInitializedError(
-                "S3 client not initialized. Call initialize() first."
-            )
+            raise S3ClientNotInitializedError("S3 client not initialized. Call initialize() first.")
 
     async def upload_audio(self, job_id: str, file: UploadFile) -> str:
         """Upload audio file to S3.
@@ -199,7 +199,7 @@ class S3Storage:
             Exception: If URL generation fails
         """
         self._ensure_initialized()
-        
+
         try:
             url = await self._client.generate_presigned_url(
                 "get_object",
@@ -215,14 +215,14 @@ class S3Storage:
 
     async def test_connectivity(self) -> bool:
         """Test S3 connectivity with HEAD request to bucket.
-        
+
         Returns:
             True if client initialized and connection successful, False otherwise
         """
         if self._client is None:
             logger.error("S3 connectivity test failed: client not initialized")
             return False
-            
+
         try:
             await self._client.head_bucket(Bucket=self.bucket)
             return True

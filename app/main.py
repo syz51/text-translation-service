@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     # Run Alembic migrations
     try:
         logger.info("Running database migrations")
-        result = subprocess.run(
+        subprocess.run(
             ["alembic", "upgrade", "head"],
             capture_output=True,
             text=True,
@@ -66,13 +66,13 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Application shutdown: Cleaning up resources")
-    
+
     # Close S3 client
     try:
         await s3_storage.close()
     except Exception as e:
         logger.error("Error closing S3 storage: %s", e)
-    
+
     logger.info("Application shutdown complete")
 
 

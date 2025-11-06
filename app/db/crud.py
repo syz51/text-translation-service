@@ -1,6 +1,6 @@
 """CRUD operations for transcription jobs."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,7 +126,7 @@ async def update_job_result(
 
     job.status = JobStatus.COMPLETED.value
     job.srt_s3_key = srt_s3_key
-    job.completed_at = completed_at or datetime.now(timezone.utc)
+    job.completed_at = completed_at or datetime.now(UTC)
 
     await session.commit()
     await session.refresh(job)

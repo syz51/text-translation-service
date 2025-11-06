@@ -1,17 +1,23 @@
 # Text Translation Service
 
-Production-grade FastAPI service for translating SRT subtitle files using Google GenAI's Gemini 2.5 Pro model.
+Production-grade FastAPI service for translating SRT subtitle files using Google GenAI's Gemini 2.5 Pro model, with transcription API capabilities (in development).
 
 ## Features
+
+### Translation Service
 
 - **SRT Format Support**: Preserves timestamps and structure
 - **Enhanced Translation**: Multi-step reasoning with extended thinking for subtitle-optimized translations
 - **Localization Support**: Optional country/region parameter for cultural adaptation
 - **Contextual Chunking**: Groups consecutive entries for better translation context and quality
 - **Concurrent Processing**: Handles multiple chunks simultaneously for speed
-- **Multiple Requests**: Async architecture supports concurrent client requests
-- **API Key Authentication**: Optional authentication layer
 - **Google GenAI Integration**: Uses Gemini 2.5 Pro with extended thinking
+
+### Infrastructure
+
+- **Database Layer**: SQLAlchemy 2.0 with async support and Alembic migrations
+- **S3 Storage**: Production-grade S3 wrapper with connection pooling for audio/SRT files
+- **API Key Authentication**: Optional authentication layer
 - **Auto Documentation**: Interactive API docs at `/docs`
 - **Production Ready**: Proper project structure, logging, config management, CORS, middleware, and tests
 - **API Versioning**: Clean v1 API structure with room for future versions
@@ -35,16 +41,31 @@ text-translation-service/
 │   │   ├── logging.py          # Logging setup
 │   │   ├── middleware.py       # Middleware configuration
 │   │   └── security.py         # Auth middleware
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── base.py             # SQLAlchemy setup
+│   │   ├── crud.py             # Database operations
+│   │   └── models.py           # Database models
 │   ├── models/
 │   │   ├── __init__.py
 │   │   └── srt.py              # SRT data models
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   └── translation.py      # Request/response schemas
-│   └── services/
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── srt_parser.py       # SRT parsing logic
+│   │   └── translation.py      # Translation service
+│   └── storage/
 │       ├── __init__.py
-│       ├── srt_parser.py       # SRT parsing logic
-│       └── translation.py      # Translation service
+│       └── s3.py               # S3 storage wrapper
+├── alembic/
+│   ├── versions/               # Database migrations
+│   ├── env.py                  # Alembic environment
+│   └── script.py.mako          # Migration template
+├── alembic.ini                 # Alembic configuration
+├── data/
+│   └── transcriptions.db       # SQLite database
 ├── scripts/
 │   ├── prestart.sh             # Pre-deployment checks
 │   ├── test.sh                 # Run tests with coverage
@@ -105,6 +126,24 @@ text-translation-service/
 4. **Optional: Enable authentication:**
    - Set `API_KEY` in `.env` to enable X-API-Key header validation
    - Leave unset to disable authentication
+
+### Database Migrations
+
+Database migrations are automatically run on application startup. To manually manage migrations:
+
+```bash
+# Create new migration
+alembic revision --autogenerate -m "description"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback one migration
+alembic downgrade -1
+
+# View migration history
+alembic history
+```
 
 ## Running
 
@@ -268,6 +307,29 @@ All configuration is managed through environment variables (see `.env.example`):
 
 - `GOOGLE_API_KEY`: Google GenAI API key
 
+### Optional - Database
+
+- `DATABASE_PATH`: SQLite database path (default: ./data/transcriptions.db)
+
+### Optional - S3 Storage
+
+- `S3_ENDPOINT_URL`: S3 endpoint URL (default: https://s3.amazonaws.com)
+- `S3_REGION`: S3 region (default: us-east-1)
+- `S3_BUCKET_NAME`: S3 bucket name
+- `S3_ACCESS_KEY_ID`: S3 access key
+- `S3_SECRET_ACCESS_KEY`: S3 secret key
+- `S3_MAX_POOL_CONNECTIONS`: Connection pool size (default: 10)
+- `S3_CONNECT_TIMEOUT`: Connection timeout in seconds (default: 60)
+- `S3_READ_TIMEOUT`: Read timeout in seconds (default: 60)
+
+### Optional - Transcription (Future)
+
+- `ASSEMBLYAI_API_KEY`: AssemblyAI API key for transcription service
+- `WEBHOOK_BASE_URL`: Base URL for webhook callbacks
+- `WEBHOOK_SECRET_TOKEN`: Secret token for webhook authentication
+- `MAX_FILE_SIZE`: Max audio file size (default: 1GB)
+- `MAX_CONCURRENT_JOBS`: Max concurrent transcription jobs (default: 10)
+
 ### Optional - Environment
 
 - `ENVIRONMENT`: Environment name (default: development)
@@ -313,9 +375,12 @@ All configuration is managed through environment variables (see `.env.example`):
 
 - **`app/api/`**: API routes organized by version (v1, v2, etc.)
 - **`app/core/`**: Core configuration, logging, middleware, security
+- **`app/db/`**: Database layer with SQLAlchemy models and CRUD operations
 - **`app/models/`**: Data models
 - **`app/schemas/`**: Pydantic request/response schemas
 - **`app/services/`**: Business logic (translation, parsing)
+- **`app/storage/`**: Storage layer (S3 wrapper with connection pooling)
+- **`alembic/`**: Database migrations
 - **`scripts/`**: Utility scripts for deployment and development
 - **`tests/`**: Unit and integration tests
 

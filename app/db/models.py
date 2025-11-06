@@ -1,6 +1,6 @@
 """Database models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 import enum
 from uuid import uuid4
 
@@ -33,7 +33,7 @@ class TranscriptionJob(Base):
     speaker_labels: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     assemblyai_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
