@@ -13,7 +13,7 @@ from tests.conftest import create_fake_audio_file
 class TestTranscriptionCreate:
     """Test POST /transcriptions endpoint."""
 
-    def test_create_success(self, client_with_auth, mock_transcription_services):
+    def test_create_success(self, client, mock_transcription_services):
         """Test successful transcription job creation."""
         # Mock settings for webhook
         with patch("app.api.v1.transcription.settings") as mock_settings:
@@ -25,7 +25,7 @@ class TestTranscriptionCreate:
             mock_settings.audio_presigned_url_expiry = 86400
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 201
             data = response.json()
@@ -33,7 +33,7 @@ class TestTranscriptionCreate:
             assert data["status"] == JobStatus.PROCESSING.value
             assert "audio_s3_key" in data
 
-    def test_create_invalid_format(self, client_with_auth, mock_transcription_services):
+    def test_create_invalid_format(self, client, mock_transcription_services):
         """Test rejection of invalid audio format."""
         with patch("app.api.v1.transcription.settings") as mock_settings:
             mock_settings.max_concurrent_jobs = 10
@@ -41,12 +41,12 @@ class TestTranscriptionCreate:
             mock_settings.max_file_size = 1_073_741_824
 
             files = {"file": ("test.txt", b"not audio", "text/plain")}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 400
             assert "Invalid audio format" in response.json()["detail"]
 
-    def test_create_file_too_large(self, client_with_auth, mock_transcription_services):
+    def test_create_file_too_large(self, client, mock_transcription_services):
         """Test rejection of files exceeding size limit."""
         with patch("app.api.v1.transcription.settings") as mock_settings:
             mock_settings.max_concurrent_jobs = 10
@@ -54,12 +54,12 @@ class TestTranscriptionCreate:
             mock_settings.max_file_size = 1024  # 1KB limit
 
             files = {"file": ("huge.mp3", create_fake_audio_file(1), "audio/mpeg")}  # 1MB file
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 413
             assert "exceeds maximum" in response.json()["detail"]
 
-    def test_create_s3_upload_failure(self, client_with_auth, mock_transcription_services_error):
+    def test_create_s3_upload_failure(self, client, mock_transcription_services_error):
         """Test handling of S3 upload failures."""
         with patch("app.api.v1.transcription.settings") as mock_settings:
             mock_settings.max_concurrent_jobs = 10
@@ -67,12 +67,12 @@ class TestTranscriptionCreate:
             mock_settings.max_file_size = 1_073_741_824
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 500
             assert "uploading audio" in response.json()["detail"].lower()
 
-    def test_create_with_language_detection(self, client_with_auth, mock_transcription_services):
+    def test_create_with_language_detection(self, client, mock_transcription_services):
         """Test creation with language detection enabled."""
         with patch("app.api.v1.transcription.settings") as mock_settings:
             mock_settings.max_concurrent_jobs = 10
@@ -84,12 +84,12 @@ class TestTranscriptionCreate:
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
             data = {"language_detection": "true"}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files, data=data)
+            response = client.post("/api/v1/transcriptions", files=files, data=data)
 
             assert response.status_code == 201
             assert response.json()["language_detection"] is True
 
-    def test_create_with_speaker_labels(self, client_with_auth, mock_transcription_services):
+    def test_create_with_speaker_labels(self, client, mock_transcription_services):
         """Test creation with speaker diarization enabled."""
         with patch("app.api.v1.transcription.settings") as mock_settings:
             mock_settings.max_concurrent_jobs = 10
@@ -101,7 +101,7 @@ class TestTranscriptionCreate:
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
             data = {"speaker_labels": "true"}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files, data=data)
+            response = client.post("/api/v1/transcriptions", files=files, data=data)
 
             assert response.status_code == 201
             assert response.json()["speaker_labels"] is True
@@ -438,7 +438,7 @@ class TestConcurrentLimits:
 
     @pytest.mark.asyncio
     async def test_exactly_at_limit(
-        self, client_with_auth, mock_transcription_services, db_session
+        self, client, mock_transcription_services, db_session
     ):
         """Test that request succeeds when exactly at limit - 1."""
         # Create 9 PROCESSING jobs (limit is 10)
@@ -460,13 +460,13 @@ class TestConcurrentLimits:
             mock_settings.audio_presigned_url_expiry = 86400
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 201
 
     @pytest.mark.asyncio
     async def test_limit_resets_when_completed(
-        self, client_with_auth, mock_transcription_services, db_session
+        self, client, mock_transcription_services, db_session
     ):
         """Test that completed jobs don't count toward limit."""
         # Create 10 COMPLETED jobs (shouldn't count)
@@ -488,13 +488,13 @@ class TestConcurrentLimits:
             mock_settings.audio_presigned_url_expiry = 86400
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 201
 
     @pytest.mark.asyncio
     async def test_limit_counts_queued_and_processing(
-        self, client_with_auth, mock_transcription_services, db_session
+        self, client, mock_transcription_services, db_session
     ):
         """Test that both QUEUED and PROCESSING jobs count toward limit."""
         # Create 5 QUEUED and 5 PROCESSING jobs (total 10, at limit)
@@ -522,13 +522,13 @@ class TestConcurrentLimits:
             mock_settings.max_file_size = 1_073_741_824
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 429
 
     @pytest.mark.asyncio
     async def test_error_jobs_dont_count(
-        self, client_with_auth, mock_transcription_services, db_session
+        self, client, mock_transcription_services, db_session
     ):
         """Test that ERROR jobs don't count toward limit."""
         # Create 10 ERROR jobs (shouldn't count)
@@ -552,7 +552,7 @@ class TestConcurrentLimits:
             mock_settings.audio_presigned_url_expiry = 86400
 
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
-            response = client_with_auth.post("/api/v1/transcriptions", files=files)
+            response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 201
 
