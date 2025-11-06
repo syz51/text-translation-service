@@ -47,7 +47,7 @@ async def process_completed_transcription(
             logger.info(
                 "Fetching transcript from AssemblyAI (attempt %d/%d)",
                 job.retry_count + 1,
-                max_attempts
+                max_attempts,
             )
             transcript_data = await assemblyai_client.fetch_transcript(assemblyai_id)
 
@@ -65,7 +65,7 @@ async def process_completed_transcription(
             if transcript_data["status"] in ("queued", "processing"):
                 logger.warning(
                     "Transcript status is '%s', webhook arrived before completion. Retrying...",
-                    transcript_data["status"]
+                    transcript_data["status"],
                 )
                 # Increment retry and continue
                 job.retry_count = await crud.increment_retry(session, job_id)

@@ -111,7 +111,7 @@ class AssemblyAIClient:
                 "Fetched transcript %s with status: %s (%.2fs)",
                 assemblyai_id,
                 result["status"],
-                elapsed
+                elapsed,
             )
             return result
 
@@ -123,9 +123,7 @@ class AssemblyAIClient:
             raise
 
     async def convert_to_srt(
-        self,
-        transcript_obj: Any = None,
-        assemblyai_id: str | None = None
+        self, transcript_obj: Any = None, assemblyai_id: str | None = None
     ) -> str:
         """Convert AssemblyAI transcript to SRT format.
 
@@ -163,7 +161,7 @@ class AssemblyAIClient:
                 "Converted transcript %s to SRT format: %d bytes (%.2fs)",
                 transcript_id,
                 srt_size,
-                elapsed
+                elapsed,
             )
             return srt_content
 
@@ -183,8 +181,7 @@ class AssemblyAIClient:
         try:
             # Try to list transcripts with limit 1 as a connectivity test - wrap in thread
             await asyncio.to_thread(
-                self.transcriber.list_transcripts,
-                aai.ListTranscriptParameters(limit=1)
+                self.transcriber.list_transcripts, aai.ListTranscriptParameters(limit=1)
             )
 
             logger.info("AssemblyAI connectivity test successful")
