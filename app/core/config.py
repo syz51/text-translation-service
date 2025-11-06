@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     max_file_size: int = 1_073_741_824  # 1GB in bytes
     max_audio_duration: int = 14_400  # 4 hours in seconds
     max_concurrent_jobs: int = 10
-    audio_presigned_url_expiry: int = 21_600  # 6 hours in seconds
+    audio_presigned_url_expiry: int = 86_400  # 24 hours in seconds (ensures AssemblyAI can access)
     srt_presigned_url_expiry: int = 3_600  # 1 hour in seconds
     retry_max_attempts: int = 3
     retry_backoff: list[int] = [1, 5, 15]  # seconds

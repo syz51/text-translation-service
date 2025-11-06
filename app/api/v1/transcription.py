@@ -185,6 +185,11 @@ async def create_transcription_job(
         )
         logger.info("Starting AssemblyAI transcription with webhook: %s", webhook_url)
 
+        # Update job to PROCESSING status first (before starting AssemblyAI)
+        # This prevents race condition where webhook arrives before job is committed
+        await crud.update_job_status(session, job_id, JobStatus.PROCESSING.value)
+
+        # Start AssemblyAI transcription after job is committed
         assemblyai_id = await assemblyai_client.start_transcription(
             presigned_url=presigned_url,
             webhook_url=webhook_url,
@@ -192,9 +197,7 @@ async def create_transcription_job(
             speaker_labels=speaker_labels,
         )
 
-        # Update job with AssemblyAI ID and set status to processing
-        # Note: update_job_status commits immediately. If webhook arrives before commit
-        # completes, AssemblyAI will retry (up to 10 times), so this is acceptable.
+        # Update job with AssemblyAI ID (job already in PROCESSING state)
         await crud.update_job_status(
             session, job_id, JobStatus.PROCESSING.value, assemblyai_id=assemblyai_id
         )

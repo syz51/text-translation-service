@@ -166,8 +166,11 @@ async def translate_batch(
     total_chunks = len(chunks)
 
     logger.info(
-        f"Starting translation: {len(texts)} entries -> {total_chunks} chunks "
-        f"(chunk_size={chunk_size}, max_concurrent={max_concurrent})"
+        "Starting translation: %d entries -> %d chunks (chunk_size=%d, max_concurrent=%d)",
+        len(texts),
+        total_chunks,
+        chunk_size,
+        max_concurrent,
     )
 
     completed_chunks = 0
@@ -193,8 +196,11 @@ async def translate_batch(
             async with completed_lock:
                 completed_chunks += 1
                 logger.info(
-                    f"Chunk {completed_chunks}/{total_chunks} complete "
-                    f"(entries {chunk_start_idx}-{chunk_end_idx})"
+                    "Chunk %d/%d complete (entries %d-%d)",
+                    completed_chunks,
+                    total_chunks,
+                    chunk_start_idx,
+                    chunk_end_idx,
                 )
 
             return result
@@ -202,7 +208,7 @@ async def translate_batch(
     tasks = [translate_chunk_with_semaphore(i, chunk) for i, chunk in enumerate(chunks)]
     translated_chunks = await asyncio.gather(*tasks)
 
-    logger.info(f"Translation complete: {len(texts)} entries translated")
+    logger.info("Translation complete: %d entries translated", len(texts))
 
     return [text for chunk in translated_chunks for text in chunk]
 
@@ -242,7 +248,7 @@ async def translate_text_chunk(
     model = model or settings.default_model
 
     if chunk_idx and total_chunks:
-        logger.info(f"Processing chunk {chunk_idx}/{total_chunks} ({len(texts)} entries)")
+        logger.info("Processing chunk %d/%d (%d entries)", chunk_idx, total_chunks, len(texts))
 
     session_id = uuid.uuid4().hex[:8]
 
