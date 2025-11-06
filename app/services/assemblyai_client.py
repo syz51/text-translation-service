@@ -173,17 +173,39 @@ class AssemblyAIClient:
             raise
 
     async def test_connectivity(self) -> bool:
-        """Test AssemblyAI API connectivity.
+        """Test AssemblyAI API connectivity and authentication.
+
+        Uses a more robust approach than list_transcripts() which may succeed
+        on free tier even with invalid keys. Attempts to fetch a non-existent
+        transcript - auth errors will fail immediately, valid keys return 404.
 
         Returns:
-            True if connected, False otherwise
+            True if connected and authenticated, False otherwise
         """
         try:
-            # Try to list transcripts with limit 1 as a connectivity test - wrap in thread
-            await asyncio.to_thread(
-                self.transcriber.list_transcripts, aai.ListTranscriptParameters(limit=1)
-            )
+            # Try to fetch a non-existent transcript ID to validate API key
+            # Valid key: raises 404 error (transcript not found)
+            # Invalid key: raises 401/403 error (authentication failed)
+            test_id = "00000000-0000-0000-0000-000000000000"
 
+            try:
+                await asyncio.to_thread(aai.Transcript.get_by_id, test_id)
+            except aai.TranscriptError as e:
+                # Check if error is 404 (expected - means auth worked)
+                error_str = str(e).lower()
+                if "not found" in error_str or "404" in error_str:
+                    logger.info("AssemblyAI connectivity test successful (API key valid)")
+                    return True
+                # Authentication/authorization errors
+                elif any(x in error_str for x in ["401", "403", "unauthorized", "forbidden"]):
+                    logger.error("AssemblyAI API key authentication failed: %s", e)
+                    return False
+                # Other errors
+                else:
+                    logger.error("AssemblyAI connectivity test failed: %s", e)
+                    return False
+
+            # If no error was raised, API is working (shouldn't happen with test ID)
             logger.info("AssemblyAI connectivity test successful")
             return True
 
