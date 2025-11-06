@@ -129,7 +129,7 @@ class AssemblyAIClient:
         """
         try:
             # Try to list transcripts with limit 1 as a connectivity test
-            page = self.transcriber.list_transcripts(aai.ListTranscriptParameters(limit=1))
+            self.transcriber.list_transcripts(aai.ListTranscriptParameters(limit=1))
 
             logger.info("AssemblyAI connectivity test successful")
             return True
@@ -141,4 +141,3 @@ class AssemblyAIClient:
 
 # Global AssemblyAI client instance
 assemblyai_client = AssemblyAIClient()
-
