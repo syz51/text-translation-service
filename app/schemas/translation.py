@@ -47,3 +47,6 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     authentication: str
+    components: dict[str, dict[str, str]] | None = Field(
+        None, description="Status of individual service components"
+    )
