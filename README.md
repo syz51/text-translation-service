@@ -313,7 +313,7 @@ All configuration is managed through environment variables (see `.env.example`):
 
 ### Optional - S3 Storage
 
-- `S3_ENDPOINT_URL`: S3 endpoint URL (default: https://s3.amazonaws.com)
+- `S3_ENDPOINT_URL`: S3 endpoint URL (default: <https://s3.amazonaws.com>)
 - `S3_REGION`: S3 region (default: us-east-1)
 - `S3_BUCKET_NAME`: S3 bucket name
 - `S3_ACCESS_KEY_ID`: S3 access key
