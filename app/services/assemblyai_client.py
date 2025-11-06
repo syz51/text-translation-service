@@ -16,15 +16,28 @@ class AssemblyAIClient:
     """Client for interacting with AssemblyAI API."""
 
     def __init__(self):
-        """Initialize AssemblyAI client with API key.
+        """Initialize AssemblyAI client (lazy initialization).
+
+        Client is initialized on first use via _ensure_initialized().
+        """
+        self._initialized = False
+        self.transcriber: aai.Transcriber | None = None
+
+    def _ensure_initialized(self):
+        """Ensure client is initialized before use.
 
         Raises:
             ValueError: If API key not configured
         """
+        if self._initialized:
+            return
+
         if not settings.assemblyai_api_key:
             raise ValueError("ASSEMBLYAI_API_KEY not configured")
+
         aai.settings.api_key = settings.assemblyai_api_key
         self.transcriber = aai.Transcriber()
+        self._initialized = True
 
     async def start_transcription(
         self,
@@ -47,6 +60,7 @@ class AssemblyAIClient:
         Raises:
             aai.TranscriptError: If transcription start fails
         """
+        self._ensure_initialized()
         try:
             config = aai.TranscriptionConfig(
                 language_detection=language_detection,
@@ -55,9 +69,15 @@ class AssemblyAIClient:
             )
 
             # Submit transcription - wrap sync call in thread to avoid blocking
+            if self.transcriber is None:
+                raise ValueError("Transcriber not initialized")
+
             transcript = await asyncio.to_thread(
                 self.transcriber.submit, presigned_url, config=config
             )
+
+            if transcript.id is None:
+                raise aai.TranscriptError("Transcription started but no ID returned")
 
             logger.info(
                 "Started AssemblyAI transcription: %s (language_detection=%s, speaker_labels=%s)",
@@ -86,6 +106,7 @@ class AssemblyAIClient:
         Raises:
             aai.TranscriptError: If fetch fails
         """
+        self._ensure_initialized()
         try:
             start_time = time.perf_counter()
 
@@ -94,16 +115,18 @@ class AssemblyAIClient:
 
             elapsed = time.perf_counter() - start_time
 
+            # Extract language_code from json_response if available
+            json_resp = transcript.json_response
+            language_code = json_resp.get("language_code") if json_resp else None
+
             result = {
                 "id": transcript.id,
                 "status": transcript.status.value,
                 "text": transcript.text,
                 "error": transcript.error,
                 "words": transcript.words,
-                "utterances": transcript.utterances if hasattr(transcript, "utterances") else None,
-                "language_code": (
-                    transcript.language_code if hasattr(transcript, "language_code") else None
-                ),
+                "utterances": transcript.utterances,
+                "language_code": language_code,
                 "transcript_obj": transcript,  # Include for convert_to_srt to avoid duplicate fetch
             }
 
@@ -138,6 +161,7 @@ class AssemblyAIClient:
             ValueError: If neither transcript_obj nor assemblyai_id provided
             aai.TranscriptError: If conversion fails
         """
+        self._ensure_initialized()
         try:
             start_time = time.perf_counter()
 
@@ -182,6 +206,7 @@ class AssemblyAIClient:
         Returns:
             True if connected and authenticated, False otherwise
         """
+        self._ensure_initialized()
         try:
             # Try to fetch a non-existent transcript ID to validate API key
             # Valid key: raises 404 error (transcript not found)

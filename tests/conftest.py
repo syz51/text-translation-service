@@ -46,8 +46,16 @@ async def init_test_db():
 
 
 @pytest.fixture
-def mock_service_connectivity():
-    """Mock all external service connectivity tests."""
+def mock_service_connectivity(fake_assemblyai_client, fake_s3_storage, monkeypatch):
+    """Mock all external service connectivity tests.
+
+    Patches global client instances to avoid requiring real API keys.
+    """
+    # Patch global instances to use fakes (avoids API key requirement)
+    monkeypatch.setattr("app.api.v1.health.assemblyai_client", fake_assemblyai_client)
+    monkeypatch.setattr("app.api.v1.health.s3_storage", fake_s3_storage)
+
+    # Also patch the connectivity methods for explicit control
     assemblyai_path = "app.services.assemblyai_client.assemblyai_client.test_connectivity"
     s3_path = "app.storage.s3.s3_storage.test_connectivity"
     with (
@@ -401,6 +409,8 @@ def mock_transcription_services(monkeypatch, fake_assemblyai_client, fake_s3_sto
     """
     monkeypatch.setattr("app.api.v1.transcription.assemblyai_client", fake_assemblyai_client)
     monkeypatch.setattr("app.api.v1.transcription.s3_storage", fake_s3_storage)
+    monkeypatch.setattr("app.api.v1.health.assemblyai_client", fake_assemblyai_client)
+    monkeypatch.setattr("app.api.v1.health.s3_storage", fake_s3_storage)
     monkeypatch.setattr(
         "app.services.transcription_service.assemblyai_client",
         fake_assemblyai_client,
@@ -416,6 +426,8 @@ def mock_transcription_services_error(
     """Mock services configured to fail for error testing."""
     monkeypatch.setattr("app.api.v1.transcription.assemblyai_client", fake_assemblyai_client_error)
     monkeypatch.setattr("app.api.v1.transcription.s3_storage", fake_s3_storage_error)
+    monkeypatch.setattr("app.api.v1.health.assemblyai_client", fake_assemblyai_client_error)
+    monkeypatch.setattr("app.api.v1.health.s3_storage", fake_s3_storage_error)
     monkeypatch.setattr(
         "app.services.transcription_service.assemblyai_client",
         fake_assemblyai_client_error,
