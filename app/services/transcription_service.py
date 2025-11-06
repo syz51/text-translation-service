@@ -15,6 +15,22 @@ from app.storage.s3 import s3_storage
 logger = logging.getLogger(__name__)
 
 
+def get_backoff_delay(retry_count: int, backoff_delays: list[int]) -> int:
+    """Get backoff delay for retry attempt.
+
+    Args:
+        retry_count: Current retry count (1-indexed)
+        backoff_delays: List of backoff delays in seconds
+
+    Returns:
+        Backoff delay in seconds
+    """
+    # Use min to cap at last delay if retry_count exceeds list length
+    # retry_count - 1 because retry_count is 1-indexed but list is 0-indexed
+    index = min(retry_count - 1, len(backoff_delays) - 1)
+    return backoff_delays[index]
+
+
 async def process_completed_transcription(
     session: AsyncSession, job_id: str, assemblyai_id: str
 ) -> None:
@@ -36,6 +52,8 @@ async def process_completed_transcription(
     backoff_delays = settings.retry_backoff
 
     # Fetch current retry count from DB
+    # Note: retry_count starts at 0 for first attempt, incremented on each failure
+    # Logging uses retry_count + 1 to show "attempt 1/3" for first attempt
     job = await crud.get_job(session, job_id)
     if not job:
         logger.error("Job %s not found", job_id)
@@ -72,7 +90,7 @@ async def process_completed_transcription(
                 await session.commit()
 
                 if job.retry_count < max_attempts:
-                    delay = backoff_delays[min(job.retry_count - 1, len(backoff_delays) - 1)]
+                    delay = get_backoff_delay(job.retry_count, backoff_delays)
                     logger.info("Retrying in %ds...", delay)
                     await asyncio.sleep(delay)
                     continue
@@ -144,8 +162,8 @@ async def process_completed_transcription(
             await session.commit()
 
             if job.retry_count < max_attempts:
-                # Calculate backoff delay with safe indexing
-                delay = backoff_delays[min(job.retry_count - 1, len(backoff_delays) - 1)]
+                # Calculate backoff delay
+                delay = get_backoff_delay(job.retry_count, backoff_delays)
                 logger.info("Retrying in %ds...", delay)
                 await asyncio.sleep(delay)
             else:

@@ -10,7 +10,7 @@ from app.db.models import JobStatus, TranscriptionJob
 
 async def create_job(
     session: AsyncSession,
-    audio_s3_key: str,
+    audio_s3_key: str | None = None,
     language_detection: bool = False,
     speaker_labels: bool = False,
 ) -> TranscriptionJob:
@@ -18,7 +18,7 @@ async def create_job(
 
     Args:
         session: Database session
-        audio_s3_key: S3 key for the audio file
+        audio_s3_key: S3 key for the audio file (optional, can be set later)
         language_detection: Enable language detection
         speaker_labels: Enable speaker labels
 
@@ -26,7 +26,7 @@ async def create_job(
         Created TranscriptionJob
     """
     job = TranscriptionJob(
-        audio_s3_key=audio_s3_key,
+        audio_s3_key=audio_s3_key or "",
         language_detection=language_detection,
         speaker_labels=speaker_labels,
         status=JobStatus.QUEUED.value,
@@ -75,8 +75,9 @@ async def update_job_status(
     status: str,
     error: str | None = None,
     assemblyai_id: str | None = None,
+    audio_s3_key: str | None = None,
 ) -> TranscriptionJob | None:
-    """Update job status and optional error message.
+    """Update job status and optional fields.
 
     Args:
         session: Database session
@@ -84,6 +85,7 @@ async def update_job_status(
         status: New status
         error: Optional error message
         assemblyai_id: Optional AssemblyAI ID
+        audio_s3_key: Optional S3 key for audio file
 
     Returns:
         Updated TranscriptionJob or None if not found
@@ -97,6 +99,8 @@ async def update_job_status(
         job.error_message = error
     if assemblyai_id is not None:
         job.assemblyai_id = assemblyai_id
+    if audio_s3_key is not None:
+        job.audio_s3_key = audio_s3_key
 
     await session.commit()
     await session.refresh(job)
