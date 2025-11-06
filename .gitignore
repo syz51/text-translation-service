@@ -61,6 +61,14 @@ venv.bak/
 *.srt
 test_*.srt
 
+# Database
+*.db
+*.db-journal
+/data/
+
+# Temporary files
+/temp/
+
 # Logs
 *.log
 
