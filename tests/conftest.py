@@ -13,7 +13,23 @@ from app.main import create_app
 
 
 @pytest.fixture
-def client():
+def mock_service_connectivity():
+    """Mock all external service connectivity tests."""
+    assemblyai_path = "app.services.assemblyai_client.assemblyai_client.test_connectivity"
+    s3_path = "app.storage.s3.s3_storage.test_connectivity"
+    with patch(assemblyai_path, new_callable=AsyncMock) as mock_assemblyai, \
+         patch(s3_path, new_callable=AsyncMock) as mock_s3:
+        # Default to healthy services
+        mock_assemblyai.return_value = True
+        mock_s3.return_value = True
+        yield {
+            "assemblyai": mock_assemblyai,
+            "s3": mock_s3,
+        }
+
+
+@pytest.fixture
+def client(mock_service_connectivity):
     """Create test client without authentication."""
     app = create_app()
     return TestClient(app)
@@ -102,7 +118,7 @@ def mock_translate_batch_error():
 
 
 @pytest.fixture
-def client_no_auth():
+def client_no_auth(mock_service_connectivity):
     """Client with no API key configured."""
     with patch("app.core.security.settings") as mock_settings:
         mock_settings.api_key = None
@@ -111,7 +127,7 @@ def client_no_auth():
 
 
 @pytest.fixture
-def client_with_auth():
+def client_with_auth(mock_service_connectivity):
     """Client with API key configured."""
     with patch("app.core.security.settings") as mock_settings:
         mock_settings.api_key = "test_secret_key_12345"
