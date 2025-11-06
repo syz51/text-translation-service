@@ -1,9 +1,9 @@
 """Logging configuration."""
 
 import logging
-import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+import sys
 
 from app.core.config import settings
 
