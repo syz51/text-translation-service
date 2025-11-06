@@ -9,7 +9,38 @@ dependencies = [
     "uvicorn[standard]>=0.38.0",
     "httpx>=0.28.1",
     "pydantic>=2.12.4",
+    "pydantic-settings>=2.7.1",
     "python-dotenv>=1.2.1",
     "pysubs2>=1.7.0",
-    "google-genai>=1.48.0",
+    "google-genai>=1.49.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "black>=25.9.0",
+    "ruff>=0.14.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = []
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true

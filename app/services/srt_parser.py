@@ -6,22 +6,8 @@ timestamps and structure.
 """
 
 import pysubs2
-from typing import List
 
-
-class SRTEntry:
-    """Represents a single subtitle entry."""
-
-    def __init__(self, index: int, start_time: str, end_time: str, text: str):
-        self.index = index
-        self.start_time = start_time
-        self.end_time = end_time
-        self.text = text
-
-    def __repr__(self) -> str:
-        return (
-            f"SRTEntry(index={self.index}, time={self.start_time} --> {self.end_time})"
-        )
+from app.models.srt import SRTEntry
 
 
 def _ms_to_srt_time(ms: int) -> str:
@@ -35,7 +21,18 @@ def _ms_to_srt_time(ms: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 
-def parse_srt(content: str) -> List[SRTEntry]:
+def _srt_time_to_ms(time_str: str) -> int:
+    """Convert SRT timestamp to milliseconds."""
+    # Format: HH:MM:SS,mmm
+    time_part, ms_part = time_str.split(",")
+    hours, minutes, seconds = map(int, time_part.split(":"))
+    milliseconds = int(ms_part)
+
+    total_ms = hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds
+    return total_ms
+
+
+def parse_srt(content: str) -> list[SRTEntry]:
     """Parse SRT content into a list of subtitle entries.
 
     Args:
@@ -47,6 +44,9 @@ def parse_srt(content: str) -> List[SRTEntry]:
     Raises:
         ValueError: If SRT format is invalid
     """
+    if not content or not content.strip():
+        raise ValueError("SRT content is empty")
+
     try:
         subs = pysubs2.SSAFile.from_string(content, format_="srt")
     except Exception as e:
@@ -61,7 +61,7 @@ def parse_srt(content: str) -> List[SRTEntry]:
     return entries
 
 
-def reconstruct_srt(entries: List[SRTEntry]) -> str:
+def reconstruct_srt(entries: list[SRTEntry]) -> str:
     """Reconstruct SRT format from list of entries.
 
     Args:
@@ -83,18 +83,7 @@ def reconstruct_srt(entries: List[SRTEntry]) -> str:
     return subs.to_string("srt")
 
 
-def _srt_time_to_ms(time_str: str) -> int:
-    """Convert SRT timestamp to milliseconds."""
-    # Format: HH:MM:SS,mmm
-    time_part, ms_part = time_str.split(",")
-    hours, minutes, seconds = map(int, time_part.split(":"))
-    milliseconds = int(ms_part)
-
-    total_ms = hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds
-    return total_ms
-
-
-def extract_texts(entries: List[SRTEntry]) -> List[str]:
+def extract_texts(entries: list[SRTEntry]) -> list[str]:
     """Extract just the text content from entries.
 
     Args:
@@ -106,9 +95,7 @@ def extract_texts(entries: List[SRTEntry]) -> List[str]:
     return [entry.text for entry in entries]
 
 
-def update_texts(
-    entries: List[SRTEntry], translated_texts: List[str]
-) -> List[SRTEntry]:
+def update_texts(entries: list[SRTEntry], translated_texts: list[str]) -> list[SRTEntry]:
     """Update entry texts with translations.
 
     Args:
@@ -128,9 +115,7 @@ def update_texts(
 
     updated_entries = []
     for entry, translated_text in zip(entries, translated_texts):
-        updated_entry = SRTEntry(
-            entry.index, entry.start_time, entry.end_time, translated_text
-        )
+        updated_entry = SRTEntry(entry.index, entry.start_time, entry.end_time, translated_text)
         updated_entries.append(updated_entry)
 
     return updated_entries
