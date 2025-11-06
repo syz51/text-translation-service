@@ -183,7 +183,7 @@ async def create_transcription_job(
             f"{settings.webhook_base_url}/api/v1/webhooks/assemblyai/"
             f"{settings.webhook_secret_token}"
         )
-        logger.info("Starting AssemblyAI transcription with webhook: %s", webhook_url)
+        logger.info("Starting AssemblyAI transcription with webhook configured")
 
         # Update job to PROCESSING status first (before starting AssemblyAI)
         # This prevents race condition where webhook arrives before job is committed

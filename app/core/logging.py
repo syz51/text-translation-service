@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 from app.core.config import settings
+from app.core.log_filter import SensitiveDataFilter
 
 
 def setup_logging() -> None:
@@ -26,6 +27,12 @@ def setup_logging() -> None:
             encoding="utf-8",
         ),
     ]
+
+    # Apply sensitive data filter to all handlers if enabled
+    if settings.enable_log_redaction:
+        log_filter = SensitiveDataFilter()
+        for handler in handlers:
+            handler.addFilter(log_filter)
 
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper()),
