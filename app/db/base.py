@@ -31,12 +31,17 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=settings.environment == "development",
     future=True,
+    pool_pre_ping=True,  # Test connections before using them
 )
 
 
 # Enable foreign keys for SQLite
 def _set_sqlite_pragma(dbapi_conn, connection_record):
-    """Enable foreign key constraints for SQLite."""
+    """Enable foreign key constraints for SQLite.
+
+    Note: Foreign keys are enabled proactively for future schema changes.
+    Current schema does not use foreign keys.
+    """
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()

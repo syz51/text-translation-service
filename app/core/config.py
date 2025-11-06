@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     s3_bucket_name: str | None = None
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
+    s3_max_pool_connections: int = 10  # Connection pool size
+    s3_connect_timeout: int = 60  # Connection timeout in seconds
+    s3_read_timeout: int = 60  # Read timeout in seconds
 
     # Transcription Limits
     max_file_size: int = 1_073_741_824  # 1GB in bytes
