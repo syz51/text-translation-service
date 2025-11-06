@@ -437,9 +437,7 @@ class TestConcurrentLimits:
     """Test concurrent job limit enforcement."""
 
     @pytest.mark.asyncio
-    async def test_exactly_at_limit(
-        self, client, mock_transcription_services, db_session
-    ):
+    async def test_exactly_at_limit(self, client, mock_transcription_services, db_session):
         """Test that request succeeds when exactly at limit - 1."""
         # Create 9 PROCESSING jobs (limit is 10)
         for i in range(9):
@@ -527,9 +525,7 @@ class TestConcurrentLimits:
             assert response.status_code == 429
 
     @pytest.mark.asyncio
-    async def test_error_jobs_dont_count(
-        self, client, mock_transcription_services, db_session
-    ):
+    async def test_error_jobs_dont_count(self, client, mock_transcription_services, db_session):
         """Test that ERROR jobs don't count toward limit."""
         # Create 10 ERROR jobs (shouldn't count)
         for i in range(10):
