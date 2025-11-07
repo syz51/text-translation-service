@@ -6,9 +6,9 @@ WORKDIR /app
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-dev
+	--mount=type=bind,source=uv.lock,target=uv.lock \
+	--mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+	uv sync --locked --no-install-project --no-dev
 
 # Copy project files
 COPY ./pyproject.toml /app/pyproject.toml
@@ -16,7 +16,7 @@ COPY ./uv.lock /app/uv.lock
 
 # Install project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+	uv sync --locked --no-dev
 
 
 FROM python:3.13-slim-bookworm
@@ -46,7 +46,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/api/v1/health', timeout=5.0)"
+	CMD python -c "import httpx; httpx.get('http://localhost:8000/api/v1/health', timeout=5.0)"
 
 # Run the application
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
