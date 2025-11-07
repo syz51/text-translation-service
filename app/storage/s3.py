@@ -8,7 +8,7 @@ from botocore.client import Config
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
-from app.core.config import settings
+from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,15 @@ class S3Storage:
     before use and closed with close() on shutdown.
     """
 
-    def __init__(self):
-        """Initialize S3 storage configuration (does not create client)."""
+    def __init__(self, settings: Settings | None = None):
+        """Initialize S3 storage configuration (does not create client).
+
+        Args:
+            settings: Optional Settings instance (uses get_settings() if not provided)
+        """
+        if settings is None:
+            settings = get_settings()
+
         self.session = aioboto3.Session()
         self.bucket = settings.s3_bucket_name
         self.endpoint_url = settings.s3_endpoint_url
@@ -46,6 +53,9 @@ class S3Storage:
                 "mode": "adaptive",
             },
         )
+
+        # Store settings for later use (e.g., in initialize())
+        self._settings = settings
 
         # Long-lived client (initialized in initialize())
         self._client: Any = None
@@ -76,7 +86,7 @@ class S3Storage:
             await self._client.head_bucket(Bucket=self.bucket)
             logger.info(
                 "S3 client initialized successfully with connection pool (max_connections=%d)",
-                settings.s3_max_pool_connections,
+                self._settings.s3_max_pool_connections,
             )
             return True
         except ClientError as e:

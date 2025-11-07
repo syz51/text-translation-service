@@ -13,10 +13,10 @@ For detailed endpoint logic and error path coverage, see test_transcription_dire
 """
 
 import asyncio
-from unittest.mock import patch
 
 import pytest
 
+from app.core.config import Settings, get_settings
 from app.db import crud
 from app.db.models import JobStatus
 from tests.conftest import create_fake_audio_file
@@ -27,14 +27,19 @@ class TestHTTPIntegration:
 
     def test_create_transcription_http(self, client, mock_transcription_services):
         """Test full HTTP request cycle for creating transcription."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-            mock_settings.webhook_base_url = "https://example.com"
-            mock_settings.webhook_secret_token = "test_secret"
-            mock_settings.audio_presigned_url_expiry = 86400
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+            webhook_base_url="https://example.com",
+            webhook_secret_token="test_secret",
+            audio_presigned_url_expiry=86400,
+        )
 
+        # Override the get_settings dependency
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
+
+        try:
             # Test multipart form-data file upload
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
             response = client.post("/api/v1/transcriptions", files=files)
@@ -44,6 +49,9 @@ class TestHTTPIntegration:
             data = response.json()
             assert "job_id" in data
             assert data["status"] == JobStatus.PROCESSING.value
+        finally:
+            # Clean up override
+            client.app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_get_status_http(self, client, mock_transcription_services, db_session):
@@ -75,27 +83,33 @@ class TestHTTPIntegration:
         await crud.update_job_result(db_session, job.id, srt_key)
         mock_transcription_services["s3"].storage[srt_key] = "1\n00:00:00,000"
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.srt_presigned_url_expiry = 3600
+        mock_settings = Settings(srt_presigned_url_expiry=3600)
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
 
+        try:
             # Test 302 redirect behavior
             response = client.get(f"/api/v1/transcriptions/{job.id}/srt", follow_redirects=False)
 
             assert response.status_code == 302
             assert "location" in response.headers
             assert "fake-s3.amazonaws.com" in response.headers["location"]
+        finally:
+            client.app.dependency_overrides.clear()
 
     def test_webhook_http(self, client, mock_transcription_services):
         """Test webhook HTTP POST handling."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = "test_secret"
+        mock_settings = Settings(webhook_secret_token="test_secret")
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
 
+        try:
             webhook_data = {"transcript_id": "fake-transcript-0", "status": "completed"}
             response = client.post("/api/v1/webhooks/assemblyai/test_secret", json=webhook_data)
 
             # Test fast response (< 10s requirement)
             assert response.status_code in [200, 404]  # 404 if job doesn't exist
             assert response.headers["content-type"] == "application/json"
+        finally:
+            client.app.dependency_overrides.clear()
 
 
 class TestRaceConditions:
@@ -117,14 +131,17 @@ class TestRaceConditions:
             db_session, job.id, JobStatus.QUEUED.value, assemblyai_id="fake-transcript-0"
         )
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = "test_secret"
+        mock_settings = Settings(webhook_secret_token="test_secret")
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
 
+        try:
             webhook_data = {"transcript_id": "fake-transcript-0", "status": "completed"}
             response = client.post("/api/v1/webhooks/assemblyai/test_secret", json=webhook_data)
 
             # Should handle gracefully even if job not in PROCESSING state
             assert response.status_code == 200
+        finally:
+            client.app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_webhook_duplicate_delivery(
@@ -142,14 +159,17 @@ class TestRaceConditions:
         )
         await crud.update_job_result(db_session, job.id, "srt/test.srt")
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = "test_secret"
+        mock_settings = Settings(webhook_secret_token="test_secret")
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
 
+        try:
             webhook_data = {"transcript_id": "fake-transcript-0", "status": "completed"}
             response = client.post("/api/v1/webhooks/assemblyai/test_secret", json=webhook_data)
 
             # Should be idempotent
             assert response.status_code == 200
+        finally:
+            client.app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_multiple_webhooks_same_job(
@@ -166,9 +186,10 @@ class TestRaceConditions:
             db_session, job.id, JobStatus.PROCESSING.value, assemblyai_id="fake-transcript-0"
         )
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = "test_secret"
+        mock_settings = Settings(webhook_secret_token="test_secret")
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
 
+        try:
             webhook_data = {"transcript_id": "fake-transcript-0", "status": "completed"}
 
             # Send multiple webhooks rapidly
@@ -178,6 +199,8 @@ class TestRaceConditions:
 
             assert response1.status_code == 200
             assert response2.status_code == 200
+        finally:
+            client.app.dependency_overrides.clear()
 
 
 class TestConcurrentLimits:
@@ -196,18 +219,23 @@ class TestConcurrentLimits:
             )
             await crud.update_job_status(db_session, job.id, JobStatus.PROCESSING.value)
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-            mock_settings.webhook_base_url = "https://example.com"
-            mock_settings.webhook_secret_token = "test_secret"
-            mock_settings.audio_presigned_url_expiry = 86400
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+            webhook_base_url="https://example.com",
+            webhook_secret_token="test_secret",
+            audio_presigned_url_expiry=86400,
+        )
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
 
+        try:
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
             response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 201
+        finally:
+            client.app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_limit_counts_queued_and_processing(
@@ -233,15 +261,20 @@ class TestConcurrentLimits:
             )
             await crud.update_job_status(db_session, job.id, JobStatus.PROCESSING.value)
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+        )
+        client.app.dependency_overrides[get_settings] = lambda: mock_settings
 
+        try:
             files = {"file": ("test.mp3", create_fake_audio_file(1), "audio/mpeg")}
             response = client.post("/api/v1/transcriptions", files=files)
 
             assert response.status_code == 429
+        finally:
+            client.app.dependency_overrides.clear()
 
 
 class TestHealthCheckDegradedStatus:

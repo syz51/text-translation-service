@@ -1,5 +1,7 @@
 """Application configuration management."""
 
+from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -82,5 +84,19 @@ class Settings(BaseSettings):
     )
 
 
-# Global settings instance
-settings = Settings()
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Get cached settings instance (singleton pattern).
+
+    Use as FastAPI dependency:
+        settings: Annotated[Settings, Depends(get_settings)]
+
+    Returns:
+        Settings: Cached settings instance
+    """
+    return Settings()
+
+
+# Module-level settings instance for backward compatibility
+# New code should use get_settings() for dependency injection
+settings = get_settings()

@@ -163,8 +163,11 @@ def mock_translate_batch_error():
 @pytest.fixture
 def client_no_auth(mock_service_connectivity):
     """Client with no API key configured."""
-    with patch("app.core.security.settings") as mock_settings:
-        mock_settings.api_key = None
+    from app.core.config import Settings
+
+    mock_settings = Settings(api_key=None)
+    # Patch where get_settings is imported in security middleware
+    with patch("app.core.security.get_settings", return_value=mock_settings):
         app = create_app()
         yield TestClient(app)
 
@@ -172,8 +175,11 @@ def client_no_auth(mock_service_connectivity):
 @pytest.fixture
 def client_with_auth(mock_service_connectivity, init_test_db):
     """Client with API key configured (no default headers)."""
-    with patch("app.core.security.settings") as mock_settings:
-        mock_settings.api_key = "test_secret_key_12345"
+    from app.core.config import Settings
+
+    mock_settings = Settings(api_key="test_secret_key_12345")
+    # Patch where get_settings is imported in security middleware
+    with patch("app.core.security.get_settings", return_value=mock_settings):
         app = create_app()
         yield TestClient(app)
 

@@ -189,6 +189,7 @@ All endpoints are prefixed with `/api/v1/`:
 - Key events logged: chunk progress, S3 operations, job state changes, webhook events
 
 **Log Security** (`app/core/log_filter.py`):
+
 - `SensitiveDataFilter` automatically redacts sensitive data from all logs
 - Configurable via `ENABLE_LOG_REDACTION` (default: true)
 - Redacts: API keys, tokens, S3 URLs, webhook secrets, passwords
@@ -198,30 +199,36 @@ All endpoints are prefixed with `/api/v1/`:
 ### Testing Patterns
 
 **Test Organization**:
+
 - 213 tests across 20 test files organized by component
 - Tests mirror app structure: `tests/api/`, `tests/services/`, `tests/core/`, etc.
 - See `tests/README.md` for comprehensive testing guide
 
 **Test Fixtures** (`tests/conftest.py`):
 
-*FastAPI Test Clients:*
+_FastAPI Test Clients:_
+
 - `client`: Test client without auth
 - `client_with_auth`: Test client with API key
 
-*Translation Fixtures:*
+_Translation Fixtures:_
+
 - `mock_genai_client`: Mock Google GenAI client
 - `create_genai_response()`: Helper to create mock API responses
 
-*Transcription Fixtures:*
+_Transcription Fixtures:_
+
 - `fake_assemblyai_client`: Test double for AssemblyAI API (returns predictable responses)
 - `fake_s3_storage`: Test double for S3 operations (in-memory storage)
 - `mock_transcription_services`: Mocked transcription service dependencies
 
-*Database Fixtures:*
+_Database Fixtures:_
+
 - `db_session`: Async database session for tests
 - `init_test_db`: Initialize test database schema
 
-*Test Doubles Pattern*:
+_Test Doubles Pattern_:
+
 - `FakeAssemblyAIClient`: In-memory implementation of AssemblyAI client
 - `FakeS3Storage`: In-memory implementation of S3 storage
 - Provides predictable behavior without external dependencies
@@ -239,6 +246,55 @@ All configuration via environment variables (see `.env.example`):
 - **Optional Polling**: `POLLING_ENABLED` (default: true), `POLLING_INTERVAL` (default: 300s), `STALE_JOB_THRESHOLD` (default: 7200s)
 - **Optional Server**: `HOST`, `PORT`, `ENVIRONMENT`, `ALLOWED_HOSTS`
 - **Optional Auth**: `API_KEY` (enables authentication if set)
+
+### Settings Management & Dependency Injection
+
+**Pattern**: Uses FastAPI's recommended DI pattern with `@lru_cache` for singleton settings (`app/core/config.py`).
+
+**In Endpoints** (use FastAPI's `Depends`):
+```python
+from typing import Annotated
+from fastapi import Depends
+from app.core.config import Settings, get_settings
+
+async def my_endpoint(
+    settings: Annotated[Settings, Depends(get_settings)]
+):
+    # Use settings.google_api_key, etc.
+```
+
+**In Services** (two patterns):
+1. **Accept optional settings param** (better testability):
+   ```python
+   def my_service_function(settings: Settings | None = None):
+       if settings is None:
+           settings = get_settings()
+       # Use settings...
+   ```
+
+2. **Call get_settings() directly** (simpler):
+   ```python
+   from app.core.config import get_settings
+
+   def my_service_function():
+       settings = get_settings()
+       # Use settings...
+   ```
+
+**In Tests**:
+```python
+from app.core.config import Settings
+
+# Create test settings instance
+test_settings = Settings(google_api_key="test_key", ...)
+
+# Pass to functions that accept optional settings
+result = await my_service(settings=test_settings)
+```
+
+**Backward Compatibility**: Module-level `settings` object still available via `from app.core.config import settings`, but new code should use `get_settings()`.
+
+**Important**: `@lru_cache(maxsize=1)` ensures singleton pattern - only one Settings instance created per process.
 
 ## Common Pitfalls
 

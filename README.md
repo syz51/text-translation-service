@@ -154,6 +154,7 @@ text-translation-service/
    ```
 
 3. **Get Google GenAI API key:**
+
    - Visit <https://aistudio.google.com/apikey>
    - Create/sign in to Google account and generate API key
    - Add to `.env` as `GOOGLE_API_KEY`
@@ -377,6 +378,7 @@ bash scripts/test.sh
 ```
 
 **See [tests/README.md](tests/README.md) for comprehensive testing guide** covering:
+
 - Test organization and structure
 - Fixtures and test doubles (FakeAssemblyAIClient, FakeS3Storage)
 - Running specific test suites

@@ -7,7 +7,7 @@ import uuid
 from google import genai
 from google.genai import types
 
-from app.core.config import settings
+from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -25,6 +25,7 @@ async def translate_text(
     source_language: str | None = None,
     model: str | None = None,
     country: str | None = None,
+    settings: Settings | None = None,
 ) -> str:
     """Translate text using Google GenAI's Gemini model with extended thinking.
 
@@ -34,6 +35,7 @@ async def translate_text(
         source_language: Optional source language hint
         model: Google GenAI model ID (default from settings)
         country: Optional target country/region for localization
+        settings: Settings instance (optional, will use get_settings() if not provided)
 
     Returns:
         Translated text
@@ -42,6 +44,9 @@ async def translate_text(
         GoogleGenAIError: If API request fails or returns error
         ValueError: If API key not configured
     """
+    if settings is None:
+        settings = get_settings()
+
     if not settings.google_api_key:
         raise ValueError(
             "GOOGLE_API_KEY not found in environment. "
@@ -147,6 +152,7 @@ async def translate_batch(
     max_concurrent: int | None = None,
     country: str | None = None,
     chunk_size: int | None = None,
+    settings: Settings | None = None,
 ) -> list[str]:
     """Translate multiple texts in chunks for better context.
 
@@ -158,6 +164,7 @@ async def translate_batch(
         max_concurrent: Maximum number of concurrent requests
         country: Optional target country/region for localization
         chunk_size: Number of entries to group together
+        settings: Settings instance (optional, will use get_settings() if not provided)
 
     Returns:
         List of translated texts in same order as input
@@ -165,6 +172,9 @@ async def translate_batch(
     Raises:
         GoogleGenAIError: If any translation fails
     """
+    if settings is None:
+        settings = get_settings()
+
     model = model or settings.default_model
     max_concurrent = max_concurrent or settings.max_concurrent_requests
     chunk_size = chunk_size or settings.default_chunk_size
@@ -198,6 +208,7 @@ async def translate_batch(
                 country=country,
                 chunk_idx=chunk_idx + 1,
                 total_chunks=total_chunks,
+                settings=settings,
             )
 
             async with completed_lock:
@@ -228,6 +239,7 @@ async def translate_text_chunk(
     country: str | None = None,
     chunk_idx: int | None = None,
     total_chunks: int | None = None,
+    settings: Settings | None = None,
 ) -> list[str]:
     """Translate chunk of subtitle entries together for better context.
 
@@ -239,6 +251,7 @@ async def translate_text_chunk(
         country: Optional target country/region for localization
         chunk_idx: Optional chunk index for logging
         total_chunks: Optional total chunks for logging
+        settings: Settings instance (optional, will use get_settings() if not provided)
 
     Returns:
         List of translated texts in same order
@@ -246,6 +259,9 @@ async def translate_text_chunk(
     Raises:
         GoogleGenAIError: If API request fails or parsing fails
     """
+    if settings is None:
+        settings = get_settings()
+
     if not settings.google_api_key:
         raise ValueError(
             "GOOGLE_API_KEY not found in environment. "

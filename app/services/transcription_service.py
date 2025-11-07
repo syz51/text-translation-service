@@ -6,7 +6,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.config import Settings, get_settings
 from app.db import crud
 from app.db.models import JobStatus
 from app.services.assemblyai_client import assemblyai_client
@@ -32,7 +32,7 @@ def get_backoff_delay(retry_count: int, backoff_delays: list[int]) -> int:
 
 
 async def process_completed_transcription(
-    session: AsyncSession, job_id: str, assemblyai_id: str
+    session: AsyncSession, job_id: str, assemblyai_id: str, settings: Settings | None = None
 ) -> None:
     """Process completed transcription with retry logic.
 
@@ -45,11 +45,14 @@ async def process_completed_transcription(
         session: Database session
         job_id: Job ID
         assemblyai_id: AssemblyAI transcription ID
+        settings: Optional Settings instance (uses get_settings() if not provided)
     """
     logger.info(
         "Processing completed transcription for job %s (AssemblyAI: %s)", job_id, assemblyai_id
     )
 
+    if settings is None:
+        settings = get_settings()
     max_attempts = settings.retry_max_attempts
     backoff_delays = settings.retry_backoff
 

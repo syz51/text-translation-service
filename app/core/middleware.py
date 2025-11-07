@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.security import AuthenticationMiddleware
 
 
@@ -15,6 +15,8 @@ def setup_middleware(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance
     """
+    settings = get_settings()
+
     # CORS middleware
     if settings.cors_enabled:
         app.add_middleware(

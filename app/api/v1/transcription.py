@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.config import Settings, get_settings
 from app.db import crud
 from app.db.base import get_db
 from app.db.models import JobStatus
@@ -31,6 +31,7 @@ async def create_transcription_job(
     language_detection: bool = Form(False, description="Enable automatic language detection"),
     speaker_labels: bool = Form(False, description="Enable speaker diarization"),
     session: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """Create new transcription job.
 
@@ -272,6 +273,7 @@ async def get_transcription_status(
 async def get_transcription_srt(
     job_id: str,
     session: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """Get transcription SRT file via 302 redirect to presigned S3 URL.
 
@@ -336,6 +338,7 @@ async def assemblyai_webhook(
     payload: AssemblyAIWebhookPayload,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """Handle AssemblyAI webhook completion notification.
 

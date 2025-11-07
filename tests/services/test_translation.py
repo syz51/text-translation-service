@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.config import Settings
 from app.services.translation import (
     GoogleGenAIError,
     translate_batch,
@@ -21,13 +22,13 @@ def mock_genai_client():
 
 @pytest.fixture
 def mock_settings():
-    """Mock settings with API key."""
-    with patch("app.services.translation.settings") as mock_settings:
-        mock_settings.google_api_key = "test_api_key"
-        mock_settings.default_model = "gemini-2.5-pro"
-        mock_settings.default_chunk_size = 100
-        mock_settings.max_concurrent_requests = 25
-        yield mock_settings
+    """Create mock Settings instance."""
+    return Settings(
+        google_api_key="test_api_key",
+        default_model="gemini-2.5-pro",
+        default_chunk_size=100,
+        max_concurrent_requests=25,
+    )
 
 
 class TestTranslateText:
@@ -47,7 +48,7 @@ class TestTranslateText:
         mock_genai_client.return_value = mock_instance
 
         # Test
-        result = await translate_text("Hello world", "Spanish")
+        result = await translate_text("Hello world", "Spanish", settings=mock_settings)
 
         assert result == "Hola mundo"
         mock_genai_client.assert_called_once_with(api_key="test_api_key")
@@ -64,7 +65,9 @@ class TestTranslateText:
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)
         mock_genai_client.return_value = mock_instance
 
-        result = await translate_text("Hello", "French", source_language="English")
+        result = await translate_text(
+            "Hello", "French", source_language="English", settings=mock_settings
+        )
 
         assert result == "Bonjour"
 
@@ -80,7 +83,9 @@ class TestTranslateText:
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)
         mock_genai_client.return_value = mock_instance
 
-        result = await translate_text("Hello", "Portuguese", country="Brazil")
+        result = await translate_text(
+            "Hello", "Portuguese", country="Brazil", settings=mock_settings
+        )
 
         assert result == "Olá"
 
@@ -99,18 +104,17 @@ class TestTranslateText:
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)
         mock_genai_client.return_value = mock_instance
 
-        result = await translate_text("Test", "Spanish")
+        result = await translate_text("Test", "Spanish", settings=mock_settings)
 
         assert result == "Translation"
         assert "Thinking" not in result
 
     async def test_translate_text_no_api_key(self, mock_genai_client):
         """Test translation fails without API key."""
-        with patch("app.services.translation.settings") as mock_settings:
-            mock_settings.google_api_key = None
+        settings_no_key = Settings(google_api_key=None)
 
-            with pytest.raises(ValueError, match="GOOGLE_API_KEY not found"):
-                await translate_text("Test", "Spanish")
+        with pytest.raises(ValueError, match="GOOGLE_API_KEY not found"):
+            await translate_text("Test", "Spanish", settings=settings_no_key)
 
     async def test_translate_text_empty_response(self, mock_genai_client, mock_settings):
         """Test translation fails with empty response."""
@@ -126,7 +130,7 @@ class TestTranslateText:
         mock_genai_client.return_value = mock_instance
 
         with pytest.raises(GoogleGenAIError, match="No translation returned"):
-            await translate_text("Test", "Spanish")
+            await translate_text("Test", "Spanish", settings=mock_settings)
 
     async def test_translate_text_api_error(self, mock_genai_client, mock_settings):
         """Test translation handles API errors."""
@@ -135,7 +139,7 @@ class TestTranslateText:
         mock_genai_client.return_value = mock_instance
 
         with pytest.raises(GoogleGenAIError, match="Error during translation: API Error"):
-            await translate_text("Test", "Spanish")
+            await translate_text("Test", "Spanish", settings=mock_settings)
 
     async def test_translate_text_multiple_parts(self, mock_genai_client, mock_settings):
         """Test translation combines multiple text parts."""
@@ -152,7 +156,7 @@ class TestTranslateText:
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)
         mock_genai_client.return_value = mock_instance
 
-        result = await translate_text("Test", "Spanish")
+        result = await translate_text("Test", "Spanish", settings=mock_settings)
 
         assert result == "Hello world"
 
@@ -181,7 +185,7 @@ class TestTranslateTextChunk:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_text_chunk(texts, "Spanish")
+            result = await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
         assert len(result) == 2
         assert result[0] == "Hola"
@@ -206,7 +210,7 @@ class TestTranslateTextChunk:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
             with pytest.raises(GoogleGenAIError, match="Failed to parse entries: \\[2\\]"):
-                await translate_text_chunk(texts, "Spanish")
+                await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
     async def test_translate_chunk_duplicate_entry(self, mock_genai_client, mock_settings):
         """Test chunk translation fails with duplicate entries."""
@@ -230,7 +234,7 @@ class TestTranslateTextChunk:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
             with pytest.raises(GoogleGenAIError, match="Duplicate entries detected: \\[1\\]"):
-                await translate_text_chunk(texts, "Spanish")
+                await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
     async def test_translate_chunk_reordered_entries(self, mock_genai_client, mock_settings):
         """Test chunk translation fails with reordered entries."""
@@ -254,7 +258,7 @@ class TestTranslateTextChunk:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
             with pytest.raises(GoogleGenAIError, match="Entries are reordered"):
-                await translate_text_chunk(texts, "Spanish")
+                await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
     async def test_translate_chunk_delimiter_contamination(self, mock_genai_client, mock_settings):
         """Test chunk translation fails with delimiter in content."""
@@ -275,15 +279,14 @@ class TestTranslateTextChunk:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
             with pytest.raises(GoogleGenAIError, match="Entry 1 contains delimiter-like content"):
-                await translate_text_chunk(texts, "Spanish")
+                await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
     async def test_translate_chunk_no_api_key(self, mock_genai_client):
         """Test chunk translation fails without API key."""
-        with patch("app.services.translation.settings") as mock_settings:
-            mock_settings.google_api_key = None
+        settings_no_key = Settings(google_api_key=None)
 
-            with pytest.raises(ValueError, match="GOOGLE_API_KEY not found"):
-                await translate_text_chunk(["Test"], "Spanish")
+        with pytest.raises(ValueError, match="GOOGLE_API_KEY not found"):
+            await translate_text_chunk(["Test"], "Spanish", settings=settings_no_key)
 
     async def test_translate_chunk_empty_response(self, mock_genai_client, mock_settings):
         """Test chunk translation fails with empty response."""
@@ -299,7 +302,7 @@ class TestTranslateTextChunk:
         mock_genai_client.return_value = mock_instance
 
         with pytest.raises(GoogleGenAIError, match="No translation returned"):
-            await translate_text_chunk(["Test"], "Spanish")
+            await translate_text_chunk(["Test"], "Spanish", settings=mock_settings)
 
     async def test_translate_chunk_with_logging(self, mock_genai_client, mock_settings):
         """Test chunk translation includes logging when indices provided."""
@@ -318,7 +321,9 @@ class TestTranslateTextChunk:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_text_chunk(texts, "Spanish", chunk_idx=1, total_chunks=5)
+            result = await translate_text_chunk(
+                texts, "Spanish", chunk_idx=1, total_chunks=5, settings=mock_settings
+            )
 
         assert result[0] == "Hola"
 
@@ -339,7 +344,7 @@ class TestTranslateTextChunk:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_text_chunk(texts, "Spanish")
+            result = await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
         # Whitespace is properly normalized (stripped)
         assert result[0] == "Hola"
@@ -362,7 +367,7 @@ class TestTranslateTextChunk:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_text_chunk(texts, "Spanish")
+            result = await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
         assert len(result) == 2
         assert result[0] == "Hola"
@@ -388,7 +393,7 @@ class TestTranslateTextChunk:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_text_chunk(texts, "Spanish")
+            result = await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
         assert result[0] == "Hola"
 
@@ -403,7 +408,7 @@ class TestTranslateTextChunk:
         with pytest.raises(
             GoogleGenAIError, match="Error during chunk translation: Network timeout"
         ):
-            await translate_text_chunk(["Test"], "Spanish")
+            await translate_text_chunk(["Test"], "Spanish", settings=mock_settings)
 
     async def test_translate_chunk_fallback_duplicate_no_session_id(
         self, mock_genai_client, mock_settings
@@ -426,7 +431,7 @@ class TestTranslateTextChunk:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
             with pytest.raises(GoogleGenAIError, match="Duplicate entries detected: \\[1\\]"):
-                await translate_text_chunk(texts, "Spanish")
+                await translate_text_chunk(texts, "Spanish", settings=mock_settings)
 
     async def test_translate_chunk_count_mismatch_defensive_check(
         self, mock_genai_client, mock_settings
@@ -482,7 +487,7 @@ class TestTranslateBatch:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_batch(texts, "Spanish", chunk_size=10)
+            result = await translate_batch(texts, "Spanish", chunk_size=10, settings=mock_settings)
 
         assert len(result) == 2
         assert result == ["Hola", "Mundo"]
@@ -514,14 +519,14 @@ class TestTranslateBatch:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_batch(texts, "Spanish", chunk_size=1)
+            result = await translate_batch(texts, "Spanish", chunk_size=1, settings=mock_settings)
 
         assert len(result) == 3
         assert result == ["Uno", "Dos", "Tres"]
 
     async def test_translate_batch_empty_list(self, mock_genai_client, mock_settings):
         """Test batch translation with empty list."""
-        result = await translate_batch([], "Spanish")
+        result = await translate_batch([], "Spanish", settings=mock_settings)
 
         assert result == []
         mock_genai_client.assert_not_called()
@@ -556,7 +561,7 @@ class TestTranslateBatch:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_batch(texts, "Spanish", chunk_size=2)
+            result = await translate_batch(texts, "Spanish", chunk_size=2, settings=mock_settings)
 
         # Should make 3 calls: chunks of 2, 2, 1
         assert call_count == 3
@@ -585,7 +590,9 @@ class TestTranslateBatch:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_batch(texts, "Spanish", chunk_size=1, max_concurrent=3)
+            result = await translate_batch(
+                texts, "Spanish", chunk_size=1, max_concurrent=3, settings=mock_settings
+            )
 
         assert len(result) == 10
         assert call_count == 10
@@ -619,6 +626,6 @@ class TestTranslateBatch:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_batch(texts, "Spanish", chunk_size=1)
+            result = await translate_batch(texts, "Spanish", chunk_size=1, settings=mock_settings)
 
         assert result == ["1st", "2nd", "3rd"]

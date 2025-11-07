@@ -1,7 +1,10 @@
 """Translation endpoints."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.core.config import Settings, get_settings
 from app.schemas import TranslationRequest, TranslationResponse
 from app.services.srt_parser import extract_texts, parse_srt, reconstruct_srt, update_texts
 from app.services.translation import GoogleGenAIError, translate_batch
@@ -16,7 +19,10 @@ router = APIRouter()
     summary="Translate SRT subtitle file",
     description="Translates SRT subtitle content while preserving timestamps and structure",
 )
-async def translate_srt(request: TranslationRequest):
+async def translate_srt(
+    request: TranslationRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
+):
     """Translate SRT subtitle file to target language.
 
     Args:
@@ -47,6 +53,7 @@ async def translate_srt(request: TranslationRequest):
             "source_language": request.source_language,
             "country": request.country,
             "chunk_size": request.chunk_size,
+            "settings": settings,
         }
         if request.model:
             translate_params["model"] = request.model
