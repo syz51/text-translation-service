@@ -399,7 +399,7 @@ class TestProcessCompletedTranscription:
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_exception_max_retries_reached(
-        self, mock_sleep, mock_aai, mock_crud, mock_get_settings
+        self, _mock_sleep, mock_aai, mock_crud, mock_get_settings
     ):
         """Test max retries reached after repeated exceptions."""
         mock_settings = Settings(retry_max_attempts=2, retry_backoff=[1, 2])
@@ -429,7 +429,7 @@ class TestProcessCompletedTranscription:
     @patch("app.services.transcription_service.s3_storage")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_s3_upload_failure_with_retry(
-        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
+        self, _mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test S3 upload failure triggers retry."""
         mock_settings = Settings(retry_max_attempts=2, retry_backoff=[1, 2])
@@ -465,7 +465,7 @@ class TestProcessCompletedTranscription:
     @patch("app.services.transcription_service.s3_storage")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_convert_to_srt_failure_with_retry(
-        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
+        self, _mock_sleep, _mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test SRT conversion failure triggers retry."""
         mock_settings = Settings(retry_max_attempts=2, retry_backoff=[1, 2])
@@ -499,7 +499,7 @@ class TestProcessCompletedTranscription:
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
     async def test_session_rollback_on_exception(
-        self, mock_s3, mock_aai, mock_crud, mock_get_settings
+        self, _mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test session rollback happens on exception."""
         mock_settings = Settings(retry_max_attempts=1, retry_backoff=[1])

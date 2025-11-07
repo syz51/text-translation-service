@@ -7,7 +7,7 @@ from typing import Any
 
 import assemblyai as aai
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +15,17 @@ logger = logging.getLogger(__name__)
 class AssemblyAIClient:
     """Client for interacting with AssemblyAI API."""
 
-    def __init__(self):
+    def __init__(self, settings: Settings | None = None):
         """Initialize AssemblyAI client (lazy initialization).
+
+        Args:
+            settings: Optional Settings instance (uses get_settings() if not provided)
 
         Client is initialized on first use via _ensure_initialized().
         """
         self._initialized = False
         self.transcriber: aai.Transcriber | None = None
+        self._settings = settings
 
     def _ensure_initialized(self):
         """Ensure client is initialized before use.
@@ -32,7 +36,7 @@ class AssemblyAIClient:
         if self._initialized:
             return
 
-        settings = get_settings()
+        settings = self._settings if self._settings is not None else get_settings()
         if not settings.assemblyai_api_key:
             raise ValueError("ASSEMBLYAI_API_KEY not configured")
 
