@@ -5,12 +5,14 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import sys
 
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.log_filter import SensitiveDataFilter
 
 
 def setup_logging() -> None:
     """Configure application logging with stdout and rotating file handlers."""
+    settings = get_settings()
+
     # Create logs directory
     logs_dir = Path("./logs")
     logs_dir.mkdir(exist_ok=True)

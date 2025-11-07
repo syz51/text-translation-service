@@ -4,7 +4,7 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.config import settings
+from app.core.config import get_settings
 
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
@@ -12,6 +12,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         """Validate API key for protected endpoints."""
+        settings = get_settings()
+
         # Skip auth for health check and docs endpoints
         if request.url.path in ["/", "/health", "/docs", "/openapi.json", "/redoc"]:
             return await call_next(request)

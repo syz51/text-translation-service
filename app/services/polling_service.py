@@ -3,7 +3,7 @@
 import asyncio
 import logging
 
-from app.core.config import settings
+from app.core.config import get_settings
 from app.db import crud
 from app.db.base import SessionLocal
 from app.services.transcription_service import process_completed_transcription
@@ -21,6 +21,7 @@ class PollingService:
 
     async def start(self) -> None:
         """Start the polling background task."""
+        settings = get_settings()
         if not settings.polling_enabled:
             logger.info("Polling disabled (POLLING_ENABLED=false)")
             return
@@ -56,6 +57,7 @@ class PollingService:
 
     async def _poll_loop(self) -> None:
         """Main polling loop that runs periodically."""
+        settings = get_settings()
         while not self._should_stop:
             try:
                 await self._poll_stale_jobs()
@@ -80,6 +82,7 @@ class PollingService:
         or polling) gets there first will process the job, and the second will
         skip it. This is intentional design, not a bug.
         """
+        settings = get_settings()
         async with SessionLocal() as session:
             try:
                 # Get stale jobs

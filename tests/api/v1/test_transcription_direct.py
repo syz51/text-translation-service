@@ -18,6 +18,7 @@ from app.api.v1.transcription import (
     get_transcription_status,
     process_transcription_background,
 )
+from app.core.config import Settings
 from app.db import crud
 from app.db.models import JobStatus
 from app.schemas.transcription import AssemblyAIWebhookPayload
@@ -30,70 +31,73 @@ class TestCreateTranscriptionJobDirect:
     @pytest.mark.asyncio
     async def test_create_success(self, db_session, mock_transcription_services):
         """Test successful transcription job creation (direct call)."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-            mock_settings.webhook_base_url = "https://example.com"
-            mock_settings.webhook_secret_token = "test_secret"
-            mock_settings.audio_presigned_url_expiry = 86400
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+            webhook_base_url="https://example.com",
+            webhook_secret_token="test_secret",
+            audio_presigned_url_expiry=86400,
+        )
 
-            # Create UploadFile
-            file_data = create_fake_audio_file(1)
-            file_data.name = "test.mp3"
-            upload_file = UploadFile(filename="test.mp3", file=file_data)
+        # Create UploadFile
+        file_data = create_fake_audio_file(1)
+        file_data.name = "test.mp3"
+        upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            result = await create_transcription_job(
-                file=upload_file,
-                language_detection=False,
-                speaker_labels=False,
-                session=db_session,
-            )
+        result = await create_transcription_job(
+            file=upload_file,
+            language_detection=False,
+            speaker_labels=False,
+            session=db_session,
+            settings=mock_settings,
+        )
 
-            assert result.job_id is not None
-            assert result.status == JobStatus.PROCESSING.value
-            assert result.audio_s3_key is not None
+        assert result.job_id is not None
+        assert result.status == JobStatus.PROCESSING.value
+        assert result.audio_s3_key is not None
 
     @pytest.mark.asyncio
     async def test_create_file_read_error(self, db_session, mock_transcription_services):
         """Test error handling when file.read() fails during size check."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+        )
 
-            # Create UploadFile with mock that fails on read
-            file_data = create_fake_audio_file(1)
-            file_data.name = "test.mp3"
-            upload_file = UploadFile(filename="test.mp3", file=file_data)
+        # Create UploadFile with mock that fails on read
+        file_data = create_fake_audio_file(1)
+        file_data.name = "test.mp3"
+        upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            # Make read() fail
-            async def failing_read(size=-1):
-                raise OSError("Read failed")
+        # Make read() fail
+        async def failing_read(size=-1):
+            raise OSError("Read failed")
 
-            upload_file.read = failing_read
+        upload_file.read = failing_read
 
-            with pytest.raises(HTTPException) as exc_info:
-                await create_transcription_job(
-                    file=upload_file,
-                    language_detection=False,
-                    speaker_labels=False,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 500
-            assert "processing file" in str(exc_info.value.detail).lower()
+        with pytest.raises(HTTPException) as exc_info:
+            await create_transcription_job(
+                file=upload_file,
+                language_detection=False,
+                speaker_labels=False,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 500
+        assert "processing file" in str(exc_info.value.detail).lower()
 
     @pytest.mark.asyncio
     async def test_create_job_creation_error(self, db_session, mock_transcription_services):
         """Test error handling when job creation fails."""
-        with (
-            patch("app.api.v1.transcription.settings") as mock_settings,
-            patch("app.api.v1.transcription.crud.create_job") as mock_create,
-        ):
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+        )
 
+        with patch("app.api.v1.transcription.crud.create_job") as mock_create:
             # Make job creation fail
             mock_create.side_effect = Exception("Database error")
 
@@ -107,6 +111,7 @@ class TestCreateTranscriptionJobDirect:
                     language_detection=False,
                     speaker_labels=False,
                     session=db_session,
+                    settings=mock_settings,
                 )
             assert exc_info.value.status_code == 500
             assert "creating transcription job" in str(exc_info.value.detail).lower()
@@ -118,16 +123,16 @@ class TestCreateTranscriptionJobDirect:
 
         fake_s3_error = FakeS3Storage(should_fail=True)
         fake_assemblyai = FakeAssemblyAIClient(should_fail=False)
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+        )
 
         with (
             patch("app.api.v1.transcription.s3_storage", fake_s3_error),
             patch("app.api.v1.transcription.assemblyai_client", fake_assemblyai),
-            patch("app.api.v1.transcription.settings") as mock_settings,
         ):
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-
             file_data = create_fake_audio_file(1)
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
@@ -138,6 +143,7 @@ class TestCreateTranscriptionJobDirect:
                     language_detection=False,
                     speaker_labels=False,
                     session=db_session,
+                    settings=mock_settings,
                 )
             assert exc_info.value.status_code == 500
             assert "uploading" in str(exc_info.value.detail).lower()
@@ -149,6 +155,11 @@ class TestCreateTranscriptionJobDirect:
 
         fake_s3 = FakeS3Storage(should_fail=False)
         fake_assemblyai = FakeAssemblyAIClient(should_fail=False)
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+        )
 
         # Make only presigned URL generation fail
         original_generate = fake_s3.generate_presigned_url
@@ -157,12 +168,7 @@ class TestCreateTranscriptionJobDirect:
         with (
             patch("app.api.v1.transcription.s3_storage", fake_s3),
             patch("app.api.v1.transcription.assemblyai_client", fake_assemblyai),
-            patch("app.api.v1.transcription.settings") as mock_settings,
         ):
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-
             file_data = create_fake_audio_file(1)
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
@@ -173,6 +179,7 @@ class TestCreateTranscriptionJobDirect:
                     language_detection=False,
                     speaker_labels=False,
                     session=db_session,
+                    settings=mock_settings,
                 )
             assert exc_info.value.status_code == 500
             assert "presigned url" in str(exc_info.value.detail).lower()
@@ -182,26 +189,28 @@ class TestCreateTranscriptionJobDirect:
     @pytest.mark.asyncio
     async def test_create_webhook_missing(self, db_session, mock_transcription_services):
         """Test error when webhook configuration is missing."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-            mock_settings.webhook_base_url = None  # Missing
-            mock_settings.webhook_secret_token = None
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+            webhook_base_url=None,  # Missing
+            webhook_secret_token=None,
+        )
 
-            file_data = create_fake_audio_file(1)
-            file_data.name = "test.mp3"
-            upload_file = UploadFile(filename="test.mp3", file=file_data)
+        file_data = create_fake_audio_file(1)
+        file_data.name = "test.mp3"
+        upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(HTTPException) as exc_info:
-                await create_transcription_job(
-                    file=upload_file,
-                    language_detection=False,
-                    speaker_labels=False,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 500
-            assert "transcription" in str(exc_info.value.detail).lower()
+        with pytest.raises(HTTPException) as exc_info:
+            await create_transcription_job(
+                file=upload_file,
+                language_detection=False,
+                speaker_labels=False,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 500
+        assert "transcription" in str(exc_info.value.detail).lower()
 
     @pytest.mark.asyncio
     async def test_create_assemblyai_error(self, db_session):
@@ -210,19 +219,19 @@ class TestCreateTranscriptionJobDirect:
 
         fake_s3 = FakeS3Storage(should_fail=False)
         fake_assemblyai = FakeAssemblyAIClient(should_fail=True)
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+            webhook_base_url="https://example.com",
+            webhook_secret_token="test_secret",
+            audio_presigned_url_expiry=86400,
+        )
 
         with (
             patch("app.api.v1.transcription.s3_storage", fake_s3),
             patch("app.api.v1.transcription.assemblyai_client", fake_assemblyai),
-            patch("app.api.v1.transcription.settings") as mock_settings,
         ):
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-            mock_settings.webhook_base_url = "https://example.com"
-            mock_settings.webhook_secret_token = "test_secret"
-            mock_settings.audio_presigned_url_expiry = 86400
-
             file_data = create_fake_audio_file(1)
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
@@ -233,6 +242,7 @@ class TestCreateTranscriptionJobDirect:
                     language_detection=False,
                     speaker_labels=False,
                     session=db_session,
+                    settings=mock_settings,
                 )
             assert exc_info.value.status_code == 500
             assert "transcription" in str(exc_info.value.detail).lower()
@@ -250,114 +260,124 @@ class TestCreateTranscriptionJobDirect:
             )
             await crud.update_job_status(db_session, job.id, JobStatus.PROCESSING.value)
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+        )
 
-            file_data = create_fake_audio_file(1)
-            file_data.name = "test.mp3"
-            upload_file = UploadFile(filename="test.mp3", file=file_data)
+        file_data = create_fake_audio_file(1)
+        file_data.name = "test.mp3"
+        upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(HTTPException) as exc_info:
-                await create_transcription_job(
-                    file=upload_file,
-                    language_detection=False,
-                    speaker_labels=False,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 429
+        with pytest.raises(HTTPException) as exc_info:
+            await create_transcription_job(
+                file=upload_file,
+                language_detection=False,
+                speaker_labels=False,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 429
 
     @pytest.mark.asyncio
     async def test_create_invalid_format(self, db_session, mock_transcription_services):
         """Test rejection of invalid audio format."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+        )
 
-            file_data = BytesIO(b"fake data")
-            file_data.name = "test.txt"
-            upload_file = UploadFile(filename="test.txt", file=file_data)
+        file_data = BytesIO(b"fake data")
+        file_data.name = "test.txt"
+        upload_file = UploadFile(filename="test.txt", file=file_data)
 
-            with pytest.raises(HTTPException) as exc_info:
-                await create_transcription_job(
-                    file=upload_file,
-                    language_detection=False,
-                    speaker_labels=False,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 400
-            assert "invalid audio format" in str(exc_info.value.detail).lower()
+        with pytest.raises(HTTPException) as exc_info:
+            await create_transcription_job(
+                file=upload_file,
+                language_detection=False,
+                speaker_labels=False,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 400
+        assert "invalid audio format" in str(exc_info.value.detail).lower()
 
     @pytest.mark.asyncio
     async def test_create_file_too_large(self, db_session, mock_transcription_services):
         """Test rejection of files exceeding size limit."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1024  # 1KB limit
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1024,  # 1KB limit
+        )
 
-            file_data = create_fake_audio_file(1)  # 1MB file
-            file_data.name = "huge.mp3"
-            upload_file = UploadFile(filename="huge.mp3", file=file_data)
+        file_data = create_fake_audio_file(1)  # 1MB file
+        file_data.name = "huge.mp3"
+        upload_file = UploadFile(filename="huge.mp3", file=file_data)
 
-            with pytest.raises(HTTPException) as exc_info:
-                await create_transcription_job(
-                    file=upload_file,
-                    language_detection=False,
-                    speaker_labels=False,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 413
+        with pytest.raises(HTTPException) as exc_info:
+            await create_transcription_job(
+                file=upload_file,
+                language_detection=False,
+                speaker_labels=False,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 413
 
     @pytest.mark.asyncio
     async def test_create_with_language_detection(self, db_session, mock_transcription_services):
         """Test creation with language detection enabled."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-            mock_settings.webhook_base_url = "https://example.com"
-            mock_settings.webhook_secret_token = "test_secret"
-            mock_settings.audio_presigned_url_expiry = 86400
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+            webhook_base_url="https://example.com",
+            webhook_secret_token="test_secret",
+            audio_presigned_url_expiry=86400,
+        )
 
-            file_data = create_fake_audio_file(1)
-            file_data.name = "test.mp3"
-            upload_file = UploadFile(filename="test.mp3", file=file_data)
+        file_data = create_fake_audio_file(1)
+        file_data.name = "test.mp3"
+        upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            result = await create_transcription_job(
-                file=upload_file,
-                language_detection=True,
-                speaker_labels=False,
-                session=db_session,
-            )
+        result = await create_transcription_job(
+            file=upload_file,
+            language_detection=True,
+            speaker_labels=False,
+            session=db_session,
+            settings=mock_settings,
+        )
 
-            assert result.language_detection is True
+        assert result.language_detection is True
 
     @pytest.mark.asyncio
     async def test_create_with_speaker_labels(self, db_session, mock_transcription_services):
         """Test creation with speaker labels enabled."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.max_concurrent_jobs = 10
-            mock_settings.allowed_audio_formats = {".mp3"}
-            mock_settings.max_file_size = 1_073_741_824
-            mock_settings.webhook_base_url = "https://example.com"
-            mock_settings.webhook_secret_token = "test_secret"
-            mock_settings.audio_presigned_url_expiry = 86400
+        mock_settings = Settings(
+            max_concurrent_jobs=10,
+            allowed_audio_formats={".mp3"},
+            max_file_size=1_073_741_824,
+            webhook_base_url="https://example.com",
+            webhook_secret_token="test_secret",
+            audio_presigned_url_expiry=86400,
+        )
 
-            file_data = create_fake_audio_file(1)
-            file_data.name = "test.mp3"
-            upload_file = UploadFile(filename="test.mp3", file=file_data)
+        file_data = create_fake_audio_file(1)
+        file_data.name = "test.mp3"
+        upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            result = await create_transcription_job(
-                file=upload_file,
-                language_detection=False,
-                speaker_labels=True,
-                session=db_session,
-            )
+        result = await create_transcription_job(
+            file=upload_file,
+            language_detection=False,
+            speaker_labels=True,
+            session=db_session,
+            settings=mock_settings,
+        )
 
-            assert result.speaker_labels is True
+        assert result.speaker_labels is True
 
 
 class TestGetTranscriptionStatusDirect:
@@ -405,13 +425,14 @@ class TestGetTranscriptionSRTDirect:
         # Upload fake SRT to storage
         mock_transcription_services["s3"].storage[srt_key] = "1\n00:00:00,000"
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.srt_presigned_url_expiry = 3600
+        mock_settings = Settings(srt_presigned_url_expiry=3600)
 
-            result = await get_transcription_srt(job_id=job.id, session=db_session)
+        result = await get_transcription_srt(
+            job_id=job.id, session=db_session, settings=mock_settings
+        )
 
-            assert result.status_code == 302
-            assert "fake-s3.amazonaws.com" in result.headers["location"]
+        assert result.status_code == 302
+        assert "fake-s3.amazonaws.com" in result.headers["location"]
 
     @pytest.mark.asyncio
     async def test_download_not_found(self, db_session):
@@ -500,13 +521,14 @@ class TestGetTranscriptionSRTDirect:
             side_effect=Exception("URL error")
         )
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.srt_presigned_url_expiry = 3600
+        mock_settings = Settings(srt_presigned_url_expiry=3600)
 
-            with pytest.raises(HTTPException) as exc_info:
-                await get_transcription_srt(job_id=job.id, session=db_session)
-            assert exc_info.value.status_code == 500
-            assert "download url" in str(exc_info.value.detail).lower()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_transcription_srt(
+                job_id=job.id, session=db_session, settings=mock_settings
+            )
+        assert exc_info.value.status_code == 500
+        assert "download url" in str(exc_info.value.detail).lower()
 
 
 class TestWebhookDirect:
@@ -525,78 +547,76 @@ class TestWebhookDirect:
             db_session, job.id, JobStatus.PROCESSING.value, assemblyai_id="fake-transcript-0"
         )
 
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = "test_secret"
+        mock_settings = Settings(webhook_secret_token="test_secret")
 
-            payload = AssemblyAIWebhookPayload(
-                transcript_id="fake-transcript-0", status="completed"
-            )
-            background_tasks = BackgroundTasks()
+        payload = AssemblyAIWebhookPayload(transcript_id="fake-transcript-0", status="completed")
+        background_tasks = BackgroundTasks()
 
-            result = await assemblyai_webhook(
-                secret_token="test_secret",
-                payload=payload,
-                background_tasks=background_tasks,
-                session=db_session,
-            )
+        result = await assemblyai_webhook(
+            secret_token="test_secret",
+            payload=payload,
+            background_tasks=background_tasks,
+            session=db_session,
+            settings=mock_settings,
+        )
 
-            assert result["status"] == "ok"
-            assert result["job_id"] == job.id
+        assert result["status"] == "ok"
+        assert result["job_id"] == job.id
 
     @pytest.mark.asyncio
     async def test_webhook_invalid_token(self, db_session):
         """Test webhook with invalid secret token."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = "correct_secret"
+        mock_settings = Settings(webhook_secret_token="correct_secret")
 
-            payload = AssemblyAIWebhookPayload(transcript_id="fake-123", status="completed")
-            background_tasks = BackgroundTasks()
+        payload = AssemblyAIWebhookPayload(transcript_id="fake-123", status="completed")
+        background_tasks = BackgroundTasks()
 
-            with pytest.raises(HTTPException) as exc_info:
-                await assemblyai_webhook(
-                    secret_token="wrong_secret",
-                    payload=payload,
-                    background_tasks=background_tasks,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 401
+        with pytest.raises(HTTPException) as exc_info:
+            await assemblyai_webhook(
+                secret_token="wrong_secret",
+                payload=payload,
+                background_tasks=background_tasks,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 401
 
     @pytest.mark.asyncio
     async def test_webhook_not_configured(self, db_session):
         """Test webhook when secret token is not configured."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = None
+        mock_settings = Settings(webhook_secret_token=None)
 
-            payload = AssemblyAIWebhookPayload(transcript_id="fake-123", status="completed")
-            background_tasks = BackgroundTasks()
+        payload = AssemblyAIWebhookPayload(transcript_id="fake-123", status="completed")
+        background_tasks = BackgroundTasks()
 
-            with pytest.raises(HTTPException) as exc_info:
-                await assemblyai_webhook(
-                    secret_token="any_token",
-                    payload=payload,
-                    background_tasks=background_tasks,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 500
-            assert "not configured" in str(exc_info.value.detail).lower()
+        with pytest.raises(HTTPException) as exc_info:
+            await assemblyai_webhook(
+                secret_token="any_token",
+                payload=payload,
+                background_tasks=background_tasks,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 500
+        assert "not configured" in str(exc_info.value.detail).lower()
 
     @pytest.mark.asyncio
     async def test_webhook_job_not_found(self, db_session):
         """Test webhook for non-existent job."""
-        with patch("app.api.v1.transcription.settings") as mock_settings:
-            mock_settings.webhook_secret_token = "test_secret"
+        mock_settings = Settings(webhook_secret_token="test_secret")
 
-            payload = AssemblyAIWebhookPayload(transcript_id="nonexistent-id", status="completed")
-            background_tasks = BackgroundTasks()
+        payload = AssemblyAIWebhookPayload(transcript_id="nonexistent-id", status="completed")
+        background_tasks = BackgroundTasks()
 
-            with pytest.raises(HTTPException) as exc_info:
-                await assemblyai_webhook(
-                    secret_token="test_secret",
-                    payload=payload,
-                    background_tasks=background_tasks,
-                    session=db_session,
-                )
-            assert exc_info.value.status_code == 404
+        with pytest.raises(HTTPException) as exc_info:
+            await assemblyai_webhook(
+                secret_token="test_secret",
+                payload=payload,
+                background_tasks=background_tasks,
+                session=db_session,
+                settings=mock_settings,
+            )
+        assert exc_info.value.status_code == 404
 
 
 class TestBackgroundProcessing:

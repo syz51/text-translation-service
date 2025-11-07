@@ -8,7 +8,7 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from app.core.config import settings
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -19,17 +19,20 @@ class Base(DeclarativeBase):
     pass
 
 
+# Get settings at module level (cached via lru_cache)
+_settings = get_settings()
+
 # Create data directory if it doesn't exist
 DATA_DIR = Path("./data")
 DATA_DIR.mkdir(exist_ok=True)
 
 # Database URL
-DATABASE_URL = f"sqlite+aiosqlite:///{settings.database_path}"
+DATABASE_URL = f"sqlite+aiosqlite:///{_settings.database_path}"
 
 # Create async engine
 engine = create_async_engine(
     DATABASE_URL,
-    echo=settings.environment == "development",
+    echo=_settings.environment == "development",
     future=True,
     pool_pre_ping=True,  # Test connections before using them
 )

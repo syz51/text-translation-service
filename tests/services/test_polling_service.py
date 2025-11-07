@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.core.config import settings
+from app.core.config import Settings
 from app.db.models import JobStatus, TranscriptionJob
 from app.services.polling_service import PollingService
 
@@ -37,7 +37,12 @@ def stale_job():
 async def test_polling_service_start_stop(polling_service):
     """Test polling service start and stop."""
     # Mock settings to enable polling
-    with patch.object(settings, "polling_enabled", True):
+    mock_settings = Settings(
+        polling_enabled=True,
+        polling_interval=300,
+        stale_job_threshold=7200,
+    )
+    with patch("app.services.polling_service.get_settings", return_value=mock_settings):
         await polling_service.start()
         assert polling_service._task is not None
         assert not polling_service._should_stop
@@ -49,7 +54,8 @@ async def test_polling_service_start_stop(polling_service):
 @pytest.mark.asyncio
 async def test_polling_service_disabled(polling_service):
     """Test polling service respects POLLING_ENABLED=false."""
-    with patch.object(settings, "polling_enabled", False):
+    mock_settings = Settings(polling_enabled=False)
+    with patch("app.services.polling_service.get_settings", return_value=mock_settings):
         await polling_service.start()
         assert polling_service._task is None
 
@@ -144,9 +150,14 @@ async def test_polling_loop_integration(polling_service):
         nonlocal poll_count
         poll_count += 1
 
+    mock_settings = Settings(
+        polling_enabled=True,
+        polling_interval=1,  # 1 second interval
+        stale_job_threshold=7200,
+    )
+
     with (
-        patch.object(settings, "polling_enabled", True),
-        patch.object(settings, "polling_interval", 1),  # 1 second interval
+        patch("app.services.polling_service.get_settings", return_value=mock_settings),
         patch.object(polling_service, "_poll_stale_jobs", mock_poll),
     ):
         await polling_service.start()

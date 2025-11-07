@@ -7,7 +7,7 @@ from typing import Any
 
 import assemblyai as aai
 
-from app.core.config import settings
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ class AssemblyAIClient:
         if self._initialized:
             return
 
+        settings = get_settings()
         if not settings.assemblyai_api_key:
             raise ValueError("ASSEMBLYAI_API_KEY not configured")
 

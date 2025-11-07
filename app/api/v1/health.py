@@ -1,8 +1,10 @@
 """Health check endpoints."""
 
-from fastapi import APIRouter, Response
+from typing import Annotated
 
-from app.core.config import settings
+from fastapi import APIRouter, Depends, Response
+
+from app.core.config import Settings, get_settings
 from app.schemas import HealthResponse
 from app.services.assemblyai_client import assemblyai_client
 from app.storage.s3 import s3_storage
@@ -12,7 +14,10 @@ router = APIRouter()
 
 @router.get("/", response_model=HealthResponse)
 @router.get("/health", response_model=HealthResponse)
-async def health_check(response: Response):
+async def health_check(
+    response: Response,
+    settings: Annotated[Settings, Depends(get_settings)],
+):
     """Health check endpoint with detailed component tests.
 
     Tests connectivity for all critical components: AssemblyAI, S3 storage.

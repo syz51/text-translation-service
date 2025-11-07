@@ -8,7 +8,7 @@ import subprocess
 from fastapi import FastAPI
 
 from app.api.v1 import api_router
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.middleware import setup_middleware
 from app.services.polling_service import polling_service
@@ -92,6 +92,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
+    settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
         description=settings.app_description,
@@ -118,6 +119,7 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
+    settings = get_settings()
     uvicorn.run(
         "app.main:app", host=settings.host, port=settings.port, proxy_headers=True, reload=False
     )

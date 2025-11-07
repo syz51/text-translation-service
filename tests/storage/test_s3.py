@@ -6,23 +6,26 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from botocore.exceptions import ClientError
 import pytest
 
+from app.core.config import Settings
 from app.storage.s3 import S3ClientNotInitializedError, S3Storage
 
 
 class TestS3StorageInitialization:
     """Test S3Storage initialization."""
 
-    @patch("app.storage.s3.settings")
-    def test_init(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    def test_init(self, mock_get_settings):
         """Test basic initialization."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_endpoint_url = None
-        mock_settings.s3_region = "us-east-1"
-        mock_settings.s3_access_key_id = "test-key"
-        mock_settings.s3_secret_access_key = "test-secret"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_region="us-east-1",
+            s3_access_key_id="test-key",
+            s3_secret_access_key="test-secret",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -32,17 +35,19 @@ class TestS3StorageInitialization:
         assert storage._client_context is None
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_initialize_success(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_initialize_success(self, mock_get_settings):
         """Test successful S3 client initialization."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_endpoint_url = None
-        mock_settings.s3_region = "us-east-1"
-        mock_settings.s3_access_key_id = "test-key"
-        mock_settings.s3_secret_access_key = "test-secret"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_region="us-east-1",
+            s3_access_key_id="test-key",
+            s3_secret_access_key="test-secret",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -63,17 +68,19 @@ class TestS3StorageInitialization:
         mock_client.head_bucket.assert_called_once_with(Bucket="test-bucket")
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_initialize_client_error(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_initialize_client_error(self, mock_get_settings):
         """Test initialization failure with ClientError."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_endpoint_url = None
-        mock_settings.s3_region = "us-east-1"
-        mock_settings.s3_access_key_id = "bad-key"
-        mock_settings.s3_secret_access_key = "bad-secret"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_region="us-east-1",
+            s3_access_key_id="bad-key",
+            s3_secret_access_key="bad-secret",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -91,17 +98,19 @@ class TestS3StorageInitialization:
         assert storage._client is None
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_initialize_generic_error(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_initialize_generic_error(self, mock_get_settings):
         """Test initialization failure with generic exception."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_endpoint_url = None
-        mock_settings.s3_region = "us-east-1"
-        mock_settings.s3_access_key_id = "test-key"
-        mock_settings.s3_secret_access_key = "test-secret"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_region="us-east-1",
+            s3_access_key_id="test-key",
+            s3_secret_access_key="test-secret",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -113,13 +122,16 @@ class TestS3StorageInitialization:
         assert storage._client is None
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_close(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_close(self, mock_get_settings):
         """Test closing S3 client."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -138,13 +150,16 @@ class TestS3StorageInitialization:
         mock_client_context.__aexit__.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_close_with_error(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_close_with_error(self, mock_get_settings):
         """Test closing S3 client when error occurs."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -165,13 +180,16 @@ class TestS3StorageInitialization:
 class TestEnsureInitialized:
     """Test _ensure_initialized method."""
 
-    @patch("app.storage.s3.settings")
-    def test_ensure_initialized_success(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    def test_ensure_initialized_success(self, mock_get_settings):
         """Test ensure initialized when client exists."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
         storage._client = AsyncMock()
@@ -179,13 +197,16 @@ class TestEnsureInitialized:
         # Should not raise
         storage._ensure_initialized()
 
-    @patch("app.storage.s3.settings")
-    def test_ensure_initialized_not_initialized(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    def test_ensure_initialized_not_initialized(self, mock_get_settings):
         """Test ensure initialized when client not initialized."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -197,13 +218,16 @@ class TestUploadAudio:
     """Test upload_audio method."""
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_upload_audio_success(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_upload_audio_success(self, mock_get_settings):
         """Test successful audio upload."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -224,13 +248,16 @@ class TestUploadAudio:
         mock_client.upload_fileobj.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_upload_audio_not_initialized(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_upload_audio_not_initialized(self, mock_get_settings):
         """Test upload audio when client not initialized."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -241,13 +268,16 @@ class TestUploadAudio:
             await storage.upload_audio("job-123", mock_file)
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_upload_audio_failure(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_upload_audio_failure(self, mock_get_settings):
         """Test upload audio failure."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -269,13 +299,16 @@ class TestUploadSRT:
     """Test upload_srt method."""
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_upload_srt_success(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_upload_srt_success(self, mock_get_settings):
         """Test successful SRT upload."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -293,13 +326,16 @@ class TestUploadSRT:
         assert call_args[1]["ContentType"] == "text/plain; charset=utf-8"
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_upload_srt_not_initialized(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_upload_srt_not_initialized(self, mock_get_settings):
         """Test upload SRT when client not initialized."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -307,13 +343,16 @@ class TestUploadSRT:
             await storage.upload_srt("job-123", "test content")
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_upload_srt_failure(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_upload_srt_failure(self, mock_get_settings):
         """Test upload SRT failure."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -329,13 +368,16 @@ class TestGeneratePresignedURL:
     """Test generate_presigned_url method."""
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_generate_presigned_url_success(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_generate_presigned_url_success(self, mock_get_settings):
         """Test successful presigned URL generation."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -356,13 +398,16 @@ class TestGeneratePresignedURL:
         )
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_generate_presigned_url_not_initialized(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_generate_presigned_url_not_initialized(self, mock_get_settings):
         """Test presigned URL generation when client not initialized."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -370,13 +415,16 @@ class TestGeneratePresignedURL:
             await storage.generate_presigned_url("srt/test.srt", 3600)
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_generate_presigned_url_failure(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_generate_presigned_url_failure(self, mock_get_settings):
         """Test presigned URL generation failure."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -392,13 +440,16 @@ class TestConnectivity:
     """Test test_connectivity method."""
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_connectivity_success(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_connectivity_success(self, mock_get_settings):
         """Test successful connectivity check."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -412,13 +463,16 @@ class TestConnectivity:
         mock_client.head_bucket.assert_called_once_with(Bucket="test-bucket")
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_connectivity_not_initialized(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_connectivity_not_initialized(self, mock_get_settings):
         """Test connectivity check when client not initialized."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 
@@ -427,13 +481,16 @@ class TestConnectivity:
         assert result is False
 
     @pytest.mark.asyncio
-    @patch("app.storage.s3.settings")
-    async def test_connectivity_failure(self, mock_settings):
+    @patch("app.storage.s3.get_settings")
+    async def test_connectivity_failure(self, mock_get_settings):
         """Test connectivity check failure."""
-        mock_settings.s3_bucket_name = "test-bucket"
-        mock_settings.s3_max_pool_connections = 10
-        mock_settings.s3_connect_timeout = 5
-        mock_settings.s3_read_timeout = 60
+        mock_settings = Settings(
+            s3_bucket_name="test-bucket",
+            s3_max_pool_connections=10,
+            s3_connect_timeout=5,
+            s3_read_timeout=60,
+        )
+        mock_get_settings.return_value = mock_settings
 
         storage = S3Storage()
 

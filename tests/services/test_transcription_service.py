@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.config import Settings
 from app.db.models import JobStatus
 from app.services.transcription_service import get_backoff_delay, process_completed_transcription
 
@@ -56,14 +57,14 @@ class TestProcessCompletedTranscription:
     """Test process_completed_transcription function."""
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
-    async def test_success_flow(self, mock_s3, mock_aai, mock_crud, mock_settings):
+    async def test_success_flow(self, mock_s3, mock_aai, mock_crud, mock_get_settings):
         """Test successful transcription processing."""
-        mock_settings.retry_max_attempts = 3
-        mock_settings.retry_backoff = [1, 2, 4]
+        mock_settings = Settings(retry_max_attempts=3, retry_backoff=[1, 2, 4])
+        mock_get_settings.return_value = mock_settings
 
         mock_crud.get_job = AsyncMock(return_value=create_mock_job())
 
@@ -89,11 +90,12 @@ class TestProcessCompletedTranscription:
         mock_crud.update_job_result.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
-    async def test_job_not_found(self, mock_crud, mock_settings):
+    async def test_job_not_found(self, mock_crud, mock_get_settings):
         """Test handling when job not found."""
-        mock_settings.retry_max_attempts = 3
+        mock_settings = Settings(retry_max_attempts=3)
+        mock_get_settings.return_value = mock_settings
         mock_crud.get_job = AsyncMock(return_value=None)
 
         mock_session = AsyncMock()
@@ -103,12 +105,13 @@ class TestProcessCompletedTranscription:
         mock_crud.get_job.assert_called_once_with(mock_session, "nonexistent")
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
-    async def test_transcript_error_status(self, mock_aai, mock_crud, mock_settings):
+    async def test_transcript_error_status(self, mock_aai, mock_crud, mock_get_settings):
         """Test handling when transcript has error status."""
-        mock_settings.retry_max_attempts = 3
+        mock_settings = Settings(retry_max_attempts=3)
+        mock_get_settings.return_value = mock_settings
 
         mock_crud.get_job = AsyncMock(return_value=create_mock_job())
         mock_aai.fetch_transcript = AsyncMock(
@@ -125,12 +128,13 @@ class TestProcessCompletedTranscription:
         )
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
-    async def test_transcript_error_no_message(self, mock_aai, mock_crud, mock_settings):
+    async def test_transcript_error_no_message(self, mock_aai, mock_crud, mock_get_settings):
         """Test handling when transcript has error status but no error message."""
-        mock_settings.retry_max_attempts = 3
+        mock_settings = Settings(retry_max_attempts=3)
+        mock_get_settings.return_value = mock_settings
 
         mock_crud.get_job = AsyncMock(return_value=create_mock_job())
         mock_aai.fetch_transcript = AsyncMock(
@@ -150,17 +154,17 @@ class TestProcessCompletedTranscription:
         )
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_transcript_processing_retry_then_success(
-        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test retry when transcript still processing, then succeeds."""
-        mock_settings.retry_max_attempts = 3
-        mock_settings.retry_backoff = [1, 2, 4]
+        mock_settings = Settings(retry_max_attempts=3, retry_backoff=[1, 2, 4])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -190,16 +194,16 @@ class TestProcessCompletedTranscription:
         mock_crud.update_job_result.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_transcript_processing_max_retries(
-        self, mock_sleep, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_aai, mock_crud, mock_get_settings
     ):
         """Test max retries reached when transcript still processing."""
-        mock_settings.retry_max_attempts = 2
-        mock_settings.retry_backoff = [1, 2]
+        mock_settings = Settings(retry_max_attempts=2, retry_backoff=[1, 2])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -219,16 +223,16 @@ class TestProcessCompletedTranscription:
         assert "not completed after" in call_args["error"]
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_transcript_queued_retry_then_success(
-        self, mock_sleep, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_aai, mock_crud, mock_get_settings
     ):
         """Test retry when transcript in queued state, then succeeds."""
-        mock_settings.retry_max_attempts = 3
-        mock_settings.retry_backoff = [1, 2, 4]
+        mock_settings = Settings(retry_max_attempts=3, retry_backoff=[1, 2, 4])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -260,12 +264,13 @@ class TestProcessCompletedTranscription:
         mock_sleep.assert_called_once_with(1)
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
-    async def test_unexpected_transcript_status(self, mock_aai, mock_crud, mock_settings):
+    async def test_unexpected_transcript_status(self, mock_aai, mock_crud, mock_get_settings):
         """Test handling of unexpected transcript status."""
-        mock_settings.retry_max_attempts = 3
+        mock_settings = Settings(retry_max_attempts=3)
+        mock_get_settings.return_value = mock_settings
 
         mock_crud.get_job = AsyncMock(return_value=create_mock_job())
         mock_aai.fetch_transcript = AsyncMock(
@@ -285,12 +290,13 @@ class TestProcessCompletedTranscription:
         )
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
-    async def test_empty_srt_content(self, mock_aai, mock_crud, mock_settings):
+    async def test_empty_srt_content(self, mock_aai, mock_crud, mock_get_settings):
         """Test handling when SRT content is empty."""
-        mock_settings.retry_max_attempts = 3
+        mock_settings = Settings(retry_max_attempts=3)
+        mock_get_settings.return_value = mock_settings
 
         mock_crud.get_job = AsyncMock(return_value=create_mock_job())
         mock_transcript_obj = MagicMock()
@@ -316,12 +322,13 @@ class TestProcessCompletedTranscription:
         )
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
-    async def test_whitespace_only_srt(self, mock_aai, mock_crud, mock_settings):
+    async def test_whitespace_only_srt(self, mock_aai, mock_crud, mock_get_settings):
         """Test handling when SRT content is whitespace only."""
-        mock_settings.retry_max_attempts = 3
+        mock_settings = Settings(retry_max_attempts=3)
+        mock_get_settings.return_value = mock_settings
 
         mock_crud.get_job = AsyncMock(return_value=create_mock_job())
         mock_transcript_obj = MagicMock()
@@ -347,17 +354,17 @@ class TestProcessCompletedTranscription:
         )
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_exception_retry_then_success(
-        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test exception triggers retry, then succeeds."""
-        mock_settings.retry_max_attempts = 3
-        mock_settings.retry_backoff = [1, 2, 4]
+        mock_settings = Settings(retry_max_attempts=3, retry_backoff=[1, 2, 4])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -387,16 +394,16 @@ class TestProcessCompletedTranscription:
         mock_session.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_exception_max_retries_reached(
-        self, mock_sleep, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_aai, mock_crud, mock_get_settings
     ):
         """Test max retries reached after repeated exceptions."""
-        mock_settings.retry_max_attempts = 2
-        mock_settings.retry_backoff = [1, 2]
+        mock_settings = Settings(retry_max_attempts=2, retry_backoff=[1, 2])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -416,17 +423,17 @@ class TestProcessCompletedTranscription:
         assert "Failed after 2 attempts" in call_args[1]["error"]
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_s3_upload_failure_with_retry(
-        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test S3 upload failure triggers retry."""
-        mock_settings.retry_max_attempts = 2
-        mock_settings.retry_backoff = [1, 2]
+        mock_settings = Settings(retry_max_attempts=2, retry_backoff=[1, 2])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -452,17 +459,17 @@ class TestProcessCompletedTranscription:
         mock_crud.update_job_status.assert_called()
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_convert_to_srt_failure_with_retry(
-        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test SRT conversion failure triggers retry."""
-        mock_settings.retry_max_attempts = 2
-        mock_settings.retry_backoff = [1, 2]
+        mock_settings = Settings(retry_max_attempts=2, retry_backoff=[1, 2])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -487,14 +494,14 @@ class TestProcessCompletedTranscription:
         mock_crud.update_job_status.assert_called()
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
-    async def test_session_rollback_on_exception(self, mock_s3, mock_aai, mock_crud, mock_settings):
+    async def test_session_rollback_on_exception(self, mock_s3, mock_aai, mock_crud, mock_get_settings):
         """Test session rollback happens on exception."""
-        mock_settings.retry_max_attempts = 1
-        mock_settings.retry_backoff = [1]
+        mock_settings = Settings(retry_max_attempts=1, retry_backoff=[1])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -510,17 +517,17 @@ class TestProcessCompletedTranscription:
         mock_session.rollback.assert_called()
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
     @patch("app.services.transcription_service.asyncio.sleep", new_callable=AsyncMock)
     async def test_multiple_retries_with_different_delays(
-        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_settings
+        self, mock_sleep, mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test multiple retries use correct backoff delays."""
-        mock_settings.retry_max_attempts = 4
-        mock_settings.retry_backoff = [1, 2, 4, 8]
+        mock_settings = Settings(retry_max_attempts=4, retry_backoff=[1, 2, 4, 8])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job()
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -554,13 +561,13 @@ class TestProcessCompletedTranscription:
         assert mock_sleep.call_args_list[2][0][0] == 4
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
-    async def test_job_already_at_max_retries(self, mock_aai, mock_crud, mock_settings):
+    async def test_job_already_at_max_retries(self, mock_aai, mock_crud, mock_get_settings):
         """Test handling when job already at max retry count."""
-        mock_settings.retry_max_attempts = 3
-        mock_settings.retry_backoff = [1, 2, 4]
+        mock_settings = Settings(retry_max_attempts=3, retry_backoff=[1, 2, 4])
+        mock_get_settings.return_value = mock_settings
 
         mock_job = create_mock_job(retry_count=3)  # Already at max
         mock_crud.get_job = AsyncMock(return_value=mock_job)
@@ -577,15 +584,16 @@ class TestProcessCompletedTranscription:
         assert "Failed to process transcription after" in call_args[1]["error"]
 
     @pytest.mark.asyncio
-    @patch("app.services.transcription_service.settings")
+    @patch("app.services.transcription_service.get_settings")
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
     async def test_transcript_obj_missing_in_response(
-        self, mock_s3, mock_aai, mock_crud, mock_settings
+        self, mock_s3, mock_aai, mock_crud, mock_get_settings
     ):
         """Test handling when transcript_obj is missing from response."""
-        mock_settings.retry_max_attempts = 3
+        mock_settings = Settings(retry_max_attempts=3)
+        mock_get_settings.return_value = mock_settings
 
         mock_crud.get_job = AsyncMock(return_value=create_mock_job())
         mock_aai.fetch_transcript = AsyncMock(
