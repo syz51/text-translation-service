@@ -182,25 +182,27 @@ async def create_transcription_job(
         await crud.update_job_status(session, job_id, JobStatus.ERROR.value, error=str(e))
         raise HTTPException(status_code=500, detail="Error generating presigned URL")
 
-    # 7. Start AssemblyAI transcription with webhook
+    # 7. Start AssemblyAI transcription (with webhook or polling)
     try:
-        # Build webhook URL with secret token
-        if not settings.webhook_base_url or not settings.webhook_secret_token:
-            raise ValueError(
-                "Webhook configuration missing (WEBHOOK_BASE_URL, WEBHOOK_SECRET_TOKEN)"
+        # Build webhook URL if config is available, otherwise use polling
+        webhook_url = None
+        if settings.webhook_base_url and settings.webhook_secret_token:
+            webhook_url = (
+                f"{settings.webhook_base_url}/api/v1/webhooks/assemblyai/"
+                f"{settings.webhook_secret_token}"
+            )
+            logger.info("Starting AssemblyAI transcription with webhook configured")
+        else:
+            logger.info(
+                "Starting AssemblyAI transcription without webhook "
+                "(will use polling for completion)"
             )
 
-        webhook_url = (
-            f"{settings.webhook_base_url}/api/v1/webhooks/assemblyai/"
-            f"{settings.webhook_secret_token}"
-        )
-        logger.info("Starting AssemblyAI transcription with webhook configured")
-
         # Update job to PROCESSING status first (before starting AssemblyAI)
-        # This prevents race condition where webhook arrives before job is committed
+        # This prevents race conditions (webhook arriving early, polling finding unprocessed job)
         await crud.update_job_status(session, job_id, JobStatus.PROCESSING.value)
 
-        # Start AssemblyAI transcription after job is committed
+        # Start AssemblyAI transcription (webhook will notify or polling will detect completion)
         assemblyai_id = await assemblyai_client.start_transcription(
             presigned_url=presigned_url,
             webhook_url=webhook_url,

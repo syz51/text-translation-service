@@ -188,12 +188,12 @@ class TestCreateTranscriptionJobDirect:
 
     @pytest.mark.asyncio
     async def test_create_webhook_missing(self, db_session, mock_transcription_services):
-        """Test error when webhook configuration is missing."""
+        """Test job creation succeeds without webhook config (uses polling fallback)."""
         mock_settings = Settings(
             max_concurrent_jobs=10,
             allowed_audio_formats={".mp3"},
             max_file_size=1_073_741_824,
-            webhook_base_url=None,  # Missing
+            webhook_base_url=None,  # Missing - should use polling
             webhook_secret_token=None,
         )
 
@@ -201,16 +201,18 @@ class TestCreateTranscriptionJobDirect:
         file_data.name = "test.mp3"
         upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-        with pytest.raises(HTTPException) as exc_info:
-            await create_transcription_job(
-                file=upload_file,
-                language_detection=False,
-                speaker_labels=False,
-                session=db_session,
-                settings=mock_settings,
-            )
-        assert exc_info.value.status_code == 500
-        assert "transcription" in str(exc_info.value.detail).lower()
+        result = await create_transcription_job(
+            file=upload_file,
+            language_detection=False,
+            speaker_labels=False,
+            session=db_session,
+            settings=mock_settings,
+        )
+
+        # Should succeed - webhooks are optional, polling is fallback
+        assert result.job_id is not None
+        assert result.status == "processing"
+        assert result.audio_s3_key.startswith("audio/")
 
     @pytest.mark.asyncio
     async def test_create_assemblyai_error(self, db_session):

@@ -49,7 +49,7 @@ class AssemblyAIClient:
     async def start_transcription(
         self,
         presigned_url: str,
-        webhook_url: str,
+        webhook_url: str | None = None,
         language_detection: bool = False,
         speaker_labels: bool = False,
     ) -> str:
@@ -57,7 +57,8 @@ class AssemblyAIClient:
 
         Args:
             presigned_url: S3 presigned URL for audio file
-            webhook_url: Webhook URL for completion notification
+            webhook_url: Optional webhook URL for completion notification
+                (uses polling if not provided)
             language_detection: Enable automatic language detection
             speaker_labels: Enable speaker diarization
 
@@ -72,7 +73,7 @@ class AssemblyAIClient:
             config = aai.TranscriptionConfig(
                 language_detection=language_detection,
                 speaker_labels=speaker_labels,
-                webhook_url=webhook_url,
+                webhook_url=webhook_url,  # None is acceptable, means no webhook
             )
 
             # Submit transcription - wrap sync call in thread to avoid blocking
