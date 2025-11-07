@@ -121,9 +121,7 @@ class PollingService:
                         logger.info("Successfully recovered stale job %s", job.id)
 
                     except Exception as e:
-                        logger.error(
-                            "Failed to recover stale job %s: %s", job.id, e, exc_info=True
-                        )
+                        logger.error("Failed to recover stale job %s: %s", job.id, e, exc_info=True)
 
             except Exception as e:
                 logger.error("Error querying stale jobs: %s", e, exc_info=True)
