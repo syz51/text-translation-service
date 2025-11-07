@@ -33,14 +33,16 @@ tests/
 │   └── v1/
 │       ├── __init__.py
 │       ├── test_health.py              # Health endpoint tests
-│       └── test_translation.py         # Translation endpoint tests
+│       ├── test_translation.py         # Translation endpoint tests
+│       └── test_transcription.py       # Transcription endpoint tests (28 tests)
 ├── services/
 │   ├── __init__.py
 │   ├── test_srt_parser.py             # SRT parsing unit tests
 │   └── test_translation.py            # Translation service unit tests
 └── core/
     ├── __init__.py
-    └── test_security.py               # Auth/security middleware tests
+    ├── test_security.py               # Auth/security middleware tests
+    └── test_log_filter.py             # Log filtering tests
 ```
 
 ### Why This Structure?
@@ -48,7 +50,7 @@ tests/
 ✅ **Mirrors app structure** - Easy to locate related tests  
 ✅ **Grouped by test classes** - Logical organization  
 ✅ **Centralized fixtures** - Single source in `conftest.py`  
-✅ **Industry standard** - FastAPI/pytest best practices  
+✅ **Industry standard** - FastAPI/pytest best practices
 
 ## Fixtures (conftest.py)
 
@@ -71,6 +73,17 @@ All fixtures centralized in `conftest.py` for reusability:
 - **`mock_settings`** - Mock app settings
 - **`mock_translate_batch_success`** - Mock successful translation
 - **`mock_translate_batch_error`** - Mock translation error
+
+### Transcription Test Doubles (Strategy 4: Fake Client)
+
+- **`fake_assemblyai_client`** - In-memory AssemblyAI client (no real API calls)
+- **`fake_assemblyai_client_error`** - Fake client configured to fail
+- **`fake_s3_storage`** - In-memory S3 storage (no real S3 calls)
+- **`fake_s3_storage_error`** - Fake storage configured to fail
+- **`mock_transcription_services`** - Patches all transcription globals with fakes
+- **`mock_transcription_services_error`** - Patches all transcription globals with error fakes
+- **`db_session`** - Async test database session (creates/drops tables)
+- **`create_fake_audio_file(size_mb)`** - Helper to create fake audio files
 
 ## Helper Utilities
 
@@ -133,11 +146,11 @@ Tests grouped into logical classes:
 ```python
 class TestTranslationValidation:
     """Test translation endpoint validation."""
-    
+
     def test_translate_missing_fields(self, client):
         """Test translation with missing required fields."""
         ...
-    
+
     def test_translate_empty_srt_content(self, client):
         """Test translation with empty SRT content."""
         ...
@@ -169,6 +182,50 @@ class translation_tests:
     def TranslateSuccess(self, client):
         ...
 ```
+
+## Mocking Strategy for External Services
+
+### AssemblyAI & S3 Mocking (Issue #17)
+
+**Strategy:** Fake Client (Test Doubles) - Strategy 4 from RFC
+
+**Why not other approaches?**
+
+- ❌ Mock at SDK level - Fragile, breaks on SDK updates
+- ❌ HTTP mocking - Must replicate entire API contract
+- ❌ VCR recordings - Recorded data expires, needs API key
+- ❌ Real API in tests - Slow, expensive, requires secrets
+
+**Implementation:**
+
+```python
+# Fake clients provide same interface, in-memory storage
+class FakeAssemblyAIClient:
+    async def start_transcription(...) -> str:
+        return f"fake-transcript-{len(self.transcripts)}"
+
+    async def fetch_transcript(self, id: str):
+        return {"status": "completed", "text": "..."}
+
+class FakeS3Storage:
+    async def upload_audio(...) -> str:
+        self.storage[key] = content
+        return key
+
+# Tests use fakes via fixtures
+def test_create_transcription(client, mock_transcription_services):
+    # mock_transcription_services patches globals with fakes
+    response = client.post("/api/v1/transcriptions", ...)
+    assert response.status_code == 201
+```
+
+**Benefits:**
+
+- ✅ No real API calls or costs
+- ✅ Fast tests (<3s for 120 tests)
+- ✅ No API keys required in CI
+- ✅ Explicit, maintainable
+- ✅ Easy to test error scenarios
 
 ## Testing Patterns
 
@@ -218,7 +275,7 @@ with patch(mock_path):
 ### Pattern 3: Using Fixtures
 
 ```python
-def test_translate_success(self, client, sample_srt_content, 
+def test_translate_success(self, client, sample_srt_content,
                           mock_translate_batch_success):
     """Fixtures injected automatically by pytest."""
     response = client.post(
@@ -243,6 +300,14 @@ def test_translate_success(self, client, sample_srt_content,
 - Success scenarios (various parameters)
 - Edge cases (large files, special chars, multiline)
 - Error handling (API errors, unexpected errors)
+
+**test_transcription.py:**
+
+- Job creation (validation, file upload, concurrent limits)
+- Status endpoint (queued, processing, completed, error)
+- SRT download (302 redirects, not ready states)
+- Webhook handling (auth, race conditions, idempotency)
+- Health check degraded status
 
 ### Service Tests (`tests/services/`)
 
@@ -386,8 +451,8 @@ Current gaps (acceptable):
 
 class TestTranslationNewFeature:
     """Test new translation feature."""
-    
-    def test_feature_success(self, client, sample_srt_content, 
+
+    def test_feature_success(self, client, sample_srt_content,
                             mock_translate_batch_success):
         """Test successful scenario."""
         # Arrange
@@ -396,15 +461,15 @@ class TestTranslationNewFeature:
             "target_language": "Spanish",
             "new_feature": True
         }
-        
+
         # Act
         response = client.post("/api/v1/translate", json=payload)
-        
+
         # Assert
         assert response.status_code == 200
         data = response.json()
         assert "translated_srt" in data
-    
+
     def test_feature_failure(self, client, sample_srt_content):
         """Test failure scenario."""
         # Arrange
@@ -413,10 +478,10 @@ class TestTranslationNewFeature:
             "target_language": "Spanish",
             "new_feature": "invalid"
         }
-        
+
         # Act
         response = client.post("/api/v1/translate", json=payload)
-        
+
         # Assert
         assert response.status_code == 422
 ```
@@ -490,4 +555,4 @@ patch("app.api.v1.translation.parse_srt")
 ✅ Comprehensive coverage (>95%)  
 ✅ Fast test execution (<1s)  
 ✅ Industry best practices  
-✅ CI/CD integrated  
+✅ CI/CD integrated

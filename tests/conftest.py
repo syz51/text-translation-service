@@ -313,17 +313,59 @@ class FakeAssemblyAIClient:
         self.transcripts[transcript_id] = {"status": "processing", "text": None}
         return transcript_id
 
-    async def fetch_transcript(self, transcript_id: str):
-        """Fetch fake transcript."""
-        if transcript_id not in self.transcripts:
-            raise ValueError(f"Transcript {transcript_id} not found")
-        mock_transcript = MagicMock()
-        mock_transcript.text = "This is a fake transcript."
-        mock_transcript.status = "completed"
-        return mock_transcript
+    async def fetch_transcript(self, assemblyai_id: str) -> dict:
+        """Fetch fake transcript.
 
-    def convert_to_srt(self, transcript) -> str:
-        """Convert fake transcript to SRT format."""
+        Args:
+            assemblyai_id: AssemblyAI transcription ID
+
+        Returns:
+            Transcript data as dictionary
+        """
+        if self.should_fail:
+            raise Exception("Failed to fetch transcript")
+        if assemblyai_id not in self.transcripts:
+            raise ValueError(f"Transcript {assemblyai_id} not found")
+
+        # Create mock transcript object
+        mock_transcript = MagicMock()
+        mock_transcript.id = assemblyai_id
+        mock_transcript.text = "This is a fake transcript."
+        mock_transcript.status = MagicMock(value="completed")
+        mock_transcript.error = None
+        mock_transcript.words = []
+        mock_transcript.utterances = []
+        mock_transcript.json_response = {"language_code": "en"}
+        mock_transcript.export_subtitles_srt = MagicMock(
+            return_value="1\n00:00:00,000 --> 00:00:05,000\nThis is a fake transcript.\n"
+        )
+
+        return {
+            "id": assemblyai_id,
+            "status": "completed",
+            "text": "This is a fake transcript.",
+            "error": None,
+            "words": [],
+            "utterances": [],
+            "language_code": "en",
+            "transcript_obj": mock_transcript,
+        }
+
+    async def convert_to_srt(self, transcript_obj=None, assemblyai_id: str | None = None) -> str:
+        """Convert fake transcript to SRT format.
+
+        Args:
+            transcript_obj: Pre-fetched transcript object
+            assemblyai_id: AssemblyAI transcription ID (if transcript_obj not provided)
+
+        Returns:
+            SRT formatted subtitle content
+        """
+        if self.should_fail:
+            raise Exception("Failed to convert to SRT")
+        if transcript_obj is None and assemblyai_id is None:
+            raise ValueError("Must provide either transcript_obj or assemblyai_id")
+
         return "1\n00:00:00,000 --> 00:00:05,000\nThis is a fake transcript.\n"
 
     async def test_connectivity(self) -> bool:
@@ -341,27 +383,48 @@ class FakeS3Storage:
         self.should_fail = should_fail
         self.storage = {}
 
-    async def upload_audio(self, file_content: bytes, job_id: str) -> str:
-        """Upload fake audio file to in-memory storage."""
+    async def upload_audio(self, job_id: str, file) -> str:
+        """Upload fake audio file to in-memory storage.
+
+        Args:
+            job_id: Job ID for organizing files
+            file: UploadFile object (has .filename and .file attributes)
+        """
         if self.should_fail:
             raise Exception("S3 upload failed")
-        key = f"audio/{job_id}.mp3"
-        self.storage[key] = file_content
+        key = f"audio/{job_id}/{file.filename}"
+        # Read file content for storage
+        content = await file.read()
+        self.storage[key] = content
+        # Reset file pointer for potential re-reads
+        await file.seek(0)
         return key
 
-    async def upload_srt(self, srt_content: str, job_id: str) -> str:
-        """Upload fake SRT file to in-memory storage."""
+    async def upload_srt(self, job_id: str, content: str) -> str:
+        """Upload fake SRT file to in-memory storage.
+
+        Args:
+            job_id: Job ID for organizing files
+            content: SRT file content as string
+        """
         if self.should_fail:
             raise Exception("S3 upload failed")
         key = f"srt/{job_id}.srt"
-        self.storage[key] = srt_content
+        self.storage[key] = content
         return key
 
-    async def generate_presigned_url(self, key: str, expiry: int = 3600) -> str:
-        """Generate fake presigned URL."""
-        if key not in self.storage:
-            raise ValueError(f"Key {key} not found")
-        return f"https://fake-s3.amazonaws.com/{key}?expires={expiry}"
+    async def generate_presigned_url(self, s3_key: str, expiry: int) -> str:
+        """Generate fake presigned URL.
+
+        Args:
+            s3_key: S3 object key
+            expiry: URL expiry time in seconds
+        """
+        if self.should_fail:
+            raise Exception("Failed to generate presigned URL")
+        if s3_key not in self.storage:
+            raise ValueError(f"Key {s3_key} not found")
+        return f"https://fake-s3.amazonaws.com/{s3_key}?expires={expiry}"
 
     async def test_connectivity(self) -> bool:
         """Test connectivity (for health checks)."""
