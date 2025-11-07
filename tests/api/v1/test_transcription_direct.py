@@ -7,8 +7,9 @@ which ensures coverage.py can properly track execution.
 from io import BytesIO
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi import BackgroundTasks, UploadFile
+from fastapi.exceptions import HTTPException
+import pytest
 
 from app.api.v1.transcription import (
     assemblyai_webhook,
@@ -68,10 +69,11 @@ class TestCreateTranscriptionJobDirect:
 
             # Make read() fail
             async def failing_read(size=-1):
-                raise IOError("Read failed")
+                raise OSError("Read failed")
+
             upload_file.read = failing_read
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -99,7 +101,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -130,7 +132,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -165,7 +167,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -191,7 +193,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -225,7 +227,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -257,7 +259,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "test.mp3"
             upload_file = UploadFile(filename="test.mp3", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -278,7 +280,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "test.txt"
             upload_file = UploadFile(filename="test.txt", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -300,7 +302,7 @@ class TestCreateTranscriptionJobDirect:
             file_data.name = "huge.mp3"
             upload_file = UploadFile(filename="huge.mp3", file=file_data)
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await create_transcription_job(
                     file=upload_file,
                     language_detection=False,
@@ -380,7 +382,7 @@ class TestGetTranscriptionStatusDirect:
     @pytest.mark.asyncio
     async def test_get_status_not_found(self, db_session):
         """Test getting status of non-existent job."""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(HTTPException) as exc_info:
             await get_transcription_status(job_id="nonexistent", session=db_session)
         assert exc_info.value.status_code == 404
 
@@ -414,7 +416,7 @@ class TestGetTranscriptionSRTDirect:
     @pytest.mark.asyncio
     async def test_download_not_found(self, db_session):
         """Test downloading SRT for non-existent job."""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(HTTPException) as exc_info:
             await get_transcription_srt(job_id="nonexistent", session=db_session)
         assert exc_info.value.status_code == 404
 
@@ -428,7 +430,7 @@ class TestGetTranscriptionSRTDirect:
             speaker_labels=False,
         )
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(HTTPException) as exc_info:
             await get_transcription_srt(job_id=job.id, session=db_session)
         assert exc_info.value.status_code == 400
 
@@ -443,7 +445,7 @@ class TestGetTranscriptionSRTDirect:
         )
         await crud.update_job_status(db_session, job.id, JobStatus.ERROR.value, error="Test error")
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(HTTPException) as exc_info:
             await get_transcription_srt(job_id=job.id, session=db_session)
         assert exc_info.value.status_code == 400
         assert "failed" in str(exc_info.value.detail).lower()
@@ -459,7 +461,7 @@ class TestGetTranscriptionSRTDirect:
         )
         await crud.update_job_status(db_session, job.id, JobStatus.PROCESSING.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(HTTPException) as exc_info:
             await get_transcription_srt(job_id=job.id, session=db_session)
         assert exc_info.value.status_code == 400
         assert "progress" in str(exc_info.value.detail).lower()
@@ -476,7 +478,7 @@ class TestGetTranscriptionSRTDirect:
         # Force job to completed status without SRT key
         await crud.update_job_status(db_session, job.id, JobStatus.COMPLETED.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(HTTPException) as exc_info:
             await get_transcription_srt(job_id=job.id, session=db_session)
         assert exc_info.value.status_code == 400
 
@@ -501,7 +503,7 @@ class TestGetTranscriptionSRTDirect:
         with patch("app.api.v1.transcription.settings") as mock_settings:
             mock_settings.srt_presigned_url_expiry = 3600
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await get_transcription_srt(job_id=job.id, session=db_session)
             assert exc_info.value.status_code == 500
             assert "download url" in str(exc_info.value.detail).lower()
@@ -550,7 +552,7 @@ class TestWebhookDirect:
             payload = AssemblyAIWebhookPayload(transcript_id="fake-123", status="completed")
             background_tasks = BackgroundTasks()
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await assemblyai_webhook(
                     secret_token="wrong_secret",
                     payload=payload,
@@ -568,7 +570,7 @@ class TestWebhookDirect:
             payload = AssemblyAIWebhookPayload(transcript_id="fake-123", status="completed")
             background_tasks = BackgroundTasks()
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await assemblyai_webhook(
                     secret_token="any_token",
                     payload=payload,
@@ -584,12 +586,10 @@ class TestWebhookDirect:
         with patch("app.api.v1.transcription.settings") as mock_settings:
             mock_settings.webhook_secret_token = "test_secret"
 
-            payload = AssemblyAIWebhookPayload(
-                transcript_id="nonexistent-id", status="completed"
-            )
+            payload = AssemblyAIWebhookPayload(transcript_id="nonexistent-id", status="completed")
             background_tasks = BackgroundTasks()
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(HTTPException) as exc_info:
                 await assemblyai_webhook(
                     secret_token="test_secret",
                     payload=payload,
