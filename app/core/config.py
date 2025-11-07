@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     cors_allow_headers: list[str] = ["*"]
 
     # Google GenAI Configuration
-    google_api_key: str
+    google_api_key: str | None = None
     default_model: str = "gemini-2.5-pro"
 
     # Translation Configuration
@@ -83,5 +83,4 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-# Pydantic Settings loads from environment variables automatically
-settings = Settings()  # type: ignore[call-arg]
+settings = Settings()
