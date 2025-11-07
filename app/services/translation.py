@@ -23,7 +23,7 @@ async def translate_text(
     text: str,
     target_language: str,
     source_language: str | None = None,
-    model: str = None,
+    model: str | None = None,
     country: str | None = None,
 ) -> str:
     """Translate text using Google GenAI's Gemini model with extended thinking.
@@ -115,6 +115,13 @@ formatting. Preserve line breaks exactly."""
             ),
         )
 
+        if (
+            not response.candidates
+            or not response.candidates[0].content
+            or not response.candidates[0].content.parts
+        ):
+            raise GoogleGenAIError("Invalid response structure from API")
+
         translated_parts = [
             part.text
             for part in response.candidates[0].content.parts
@@ -136,10 +143,10 @@ async def translate_batch(
     texts: list[str],
     target_language: str,
     source_language: str | None = None,
-    model: str = None,
-    max_concurrent: int = None,
+    model: str | None = None,
+    max_concurrent: int | None = None,
     country: str | None = None,
-    chunk_size: int = None,
+    chunk_size: int | None = None,
 ) -> list[str]:
     """Translate multiple texts in chunks for better context.
 
@@ -217,7 +224,7 @@ async def translate_text_chunk(
     texts: list[str],
     target_language: str,
     source_language: str | None = None,
-    model: str = None,
+    model: str | None = None,
     country: str | None = None,
     chunk_idx: int | None = None,
     total_chunks: int | None = None,
@@ -336,6 +343,13 @@ extra text. Preserve line breaks within entries exactly."""
                 ),
             ),
         )
+
+        if (
+            not response.candidates
+            or not response.candidates[0].content
+            or not response.candidates[0].content.parts
+        ):
+            raise GoogleGenAIError("Invalid response structure from API")
 
         translated_parts = [
             part.text

@@ -115,7 +115,11 @@ class TestTranslateText:
     async def test_translate_text_empty_response(self, mock_genai_client, mock_settings):
         """Test translation fails with empty response."""
         mock_response = MagicMock()
-        mock_response.candidates = [MagicMock(content=MagicMock(parts=[]))]
+        # Empty parts list should still pass validation
+        part = MagicMock()
+        part.text = ""
+        part.thought = False
+        mock_response.candidates = [MagicMock(content=MagicMock(parts=[part]))]
 
         mock_instance = MagicMock()
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)
@@ -284,7 +288,11 @@ class TestTranslateTextChunk:
     async def test_translate_chunk_empty_response(self, mock_genai_client, mock_settings):
         """Test chunk translation fails with empty response."""
         mock_response = MagicMock()
-        mock_response.candidates = [MagicMock(content=MagicMock(parts=[]))]
+        # Empty parts list should still pass validation
+        part = MagicMock()
+        part.text = ""
+        part.thought = False
+        mock_response.candidates = [MagicMock(content=MagicMock(parts=[part]))]
 
         mock_instance = MagicMock()
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)

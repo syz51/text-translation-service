@@ -190,6 +190,7 @@ async def test_idempotency_check(polling_service, stale_job):
 
         async with SessionLocal() as session:
             # Should return early without calling AssemblyAI
+            assert completed_job.assemblyai_id is not None
             await process_completed_transcription(
                 session, completed_job.id, completed_job.assemblyai_id
             )
