@@ -76,9 +76,10 @@ class S3Storage:
 
             # Test connectivity with HEAD bucket
             await self._client.head_bucket(Bucket=self.bucket)
+            settings = get_settings()
             logger.info(
                 "S3 client initialized successfully with connection pool (max_connections=%d)",
-                self.config.max_pool_connections,
+                settings.s3_max_pool_connections,
             )
             return True
         except ClientError as e:

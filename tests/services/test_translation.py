@@ -65,7 +65,9 @@ class TestTranslateText:
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)
         mock_genai_client.return_value = mock_instance
 
-        result = await translate_text("Hello", "French", source_language="English", settings=mock_settings)
+        result = await translate_text(
+            "Hello", "French", source_language="English", settings=mock_settings
+        )
 
         assert result == "Bonjour"
 
@@ -81,7 +83,9 @@ class TestTranslateText:
         mock_instance.aio.models.generate_content = AsyncMock(return_value=mock_response)
         mock_genai_client.return_value = mock_instance
 
-        result = await translate_text("Hello", "Portuguese", country="Brazil", settings=mock_settings)
+        result = await translate_text(
+            "Hello", "Portuguese", country="Brazil", settings=mock_settings
+        )
 
         assert result == "Olá"
 
@@ -317,7 +321,9 @@ class TestTranslateTextChunk:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_text_chunk(texts, "Spanish", chunk_idx=1, total_chunks=5, settings=mock_settings)
+            result = await translate_text_chunk(
+                texts, "Spanish", chunk_idx=1, total_chunks=5, settings=mock_settings
+            )
 
         assert result[0] == "Hola"
 
@@ -584,7 +590,9 @@ class TestTranslateBatch:
         with patch("app.services.translation.uuid") as mock_uuid:
             mock_uuid.uuid4.return_value.hex = "12345678abcdef"
 
-            result = await translate_batch(texts, "Spanish", chunk_size=1, max_concurrent=3, settings=mock_settings)
+            result = await translate_batch(
+                texts, "Spanish", chunk_size=1, max_concurrent=3, settings=mock_settings
+            )
 
         assert len(result) == 10
         assert call_count == 10

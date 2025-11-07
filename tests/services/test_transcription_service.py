@@ -498,7 +498,9 @@ class TestProcessCompletedTranscription:
     @patch("app.services.transcription_service.crud")
     @patch("app.services.transcription_service.assemblyai_client")
     @patch("app.services.transcription_service.s3_storage")
-    async def test_session_rollback_on_exception(self, mock_s3, mock_aai, mock_crud, mock_get_settings):
+    async def test_session_rollback_on_exception(
+        self, mock_s3, mock_aai, mock_crud, mock_get_settings
+    ):
         """Test session rollback happens on exception."""
         mock_settings = Settings(retry_max_attempts=1, retry_backoff=[1])
         mock_get_settings.return_value = mock_settings

@@ -3,7 +3,6 @@
 import logging
 from pathlib import Path
 import secrets
-from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse

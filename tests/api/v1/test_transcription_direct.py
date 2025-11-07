@@ -524,9 +524,7 @@ class TestGetTranscriptionSRTDirect:
         mock_settings = Settings(srt_presigned_url_expiry=3600)
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_transcription_srt(
-                job_id=job.id, session=db_session, settings=mock_settings
-            )
+            await get_transcription_srt(job_id=job.id, session=db_session, settings=mock_settings)
         assert exc_info.value.status_code == 500
         assert "download url" in str(exc_info.value.detail).lower()
 
