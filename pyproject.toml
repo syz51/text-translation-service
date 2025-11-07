@@ -26,6 +26,7 @@ dev = [
 	"pytest>=8.4.2",
 	"pytest-asyncio>=1.2.0",
 	"pytest-cov>=7.0.0",
+	"pytest-env>=1.2.0",
 	"black>=25.9.0",
 	"ruff>=0.14.4",
 ]
@@ -34,6 +35,7 @@ dev = [
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+env = ["DATABASE_PATH=./data/test.db"]
 
 [tool.black]
 line-length = 100

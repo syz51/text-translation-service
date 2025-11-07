@@ -226,6 +226,7 @@ _Database Fixtures:_
 
 - `db_session`: Async database session for tests
 - `init_test_db`: Initialize test database schema
+- **Database Separation**: Tests use `./data/test.db` (configured via pytest-env), normal runs use `./data/transcriptions.db`
 
 _Test Doubles Pattern_:
 
