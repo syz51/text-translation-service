@@ -33,7 +33,8 @@ class S3Storage:
         Args:
             settings: Optional Settings instance (uses get_settings() if not provided)
         """
-        settings = settings if settings is not None else get_settings()
+        if settings is None:
+            settings = get_settings()
 
         self.session = aioboto3.Session()
         self.bucket = settings.s3_bucket_name

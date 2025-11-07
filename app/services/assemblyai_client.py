@@ -25,6 +25,9 @@ class AssemblyAIClient:
         """
         self._initialized = False
         self.transcriber: aai.Transcriber | None = None
+        # Resolve and store settings immediately for consistent behavior
+        if settings is None:
+            settings = get_settings()
         self._settings = settings
 
     def _ensure_initialized(self):
@@ -36,11 +39,10 @@ class AssemblyAIClient:
         if self._initialized:
             return
 
-        settings = self._settings if self._settings is not None else get_settings()
-        if not settings.assemblyai_api_key:
+        if not self._settings.assemblyai_api_key:
             raise ValueError("ASSEMBLYAI_API_KEY not configured")
 
-        aai.settings.api_key = settings.assemblyai_api_key
+        aai.settings.api_key = self._settings.assemblyai_api_key
         self.transcriber = aai.Transcriber()
         self._initialized = True
 
