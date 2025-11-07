@@ -91,11 +91,23 @@ class S3Storage:
             return True
         except ClientError as e:
             logger.error("Failed to initialize S3 client: %s", e)
+            # Properly cleanup client if __aenter__ was called
+            if self._client_context is not None:
+                try:
+                    await self._client_context.__aexit__(None, None, None)
+                except Exception:
+                    pass  # Already in error state, ignore cleanup errors
             self._client = None
             self._client_context = None
             return False
         except Exception as e:
             logger.error("Unexpected error initializing S3 client: %s", e)
+            # Properly cleanup client if __aenter__ was called
+            if self._client_context is not None:
+                try:
+                    await self._client_context.__aexit__(None, None, None)
+                except Exception:
+                    pass  # Already in error state, ignore cleanup errors
             self._client = None
             self._client_context = None
             return False
