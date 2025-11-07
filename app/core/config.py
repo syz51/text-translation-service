@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     webhook_timeout: int = 10  # seconds
     allowed_audio_formats: set[str] = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm"}
 
+    # Polling/Recovery Configuration
+    polling_enabled: bool = True  # Enable background polling for stale jobs
+    polling_interval: int = 300  # 5 minutes in seconds
+    stale_job_threshold: int = 7200  # 2 hours in seconds
+
     # Logging
     log_level: str = "INFO"
     enable_log_redaction: bool = True  # Redact sensitive data from logs

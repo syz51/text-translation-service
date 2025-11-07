@@ -329,6 +329,9 @@ All configuration is managed through environment variables (see `.env.example`):
 - `WEBHOOK_SECRET_TOKEN`: Secret token for webhook authentication
 - `MAX_FILE_SIZE`: Max audio file size (default: 1GB)
 - `MAX_CONCURRENT_JOBS`: Max concurrent transcription jobs (default: 10)
+- `POLLING_ENABLED`: Enable background polling for stale jobs (default: true)
+- `POLLING_INTERVAL`: Polling interval in seconds (default: 300)
+- `STALE_JOB_THRESHOLD`: Threshold for stale jobs in seconds (default: 7200)
 
 ### Optional - Environment
 
