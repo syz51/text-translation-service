@@ -32,7 +32,7 @@ DATABASE_URL = f"sqlite+aiosqlite:///{_settings.database_path}"
 # Create async engine
 engine = create_async_engine(
     DATABASE_URL,
-    echo=_settings.environment == "development",
+    echo=False,  # Disable SQL query logging (too noisy)
     future=True,
     pool_pre_ping=True,  # Test connections before using them
 )

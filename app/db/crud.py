@@ -194,3 +194,22 @@ async def get_stale_processing_jobs(
         .where(TranscriptionJob.assemblyai_id.isnot(None))
     )
     return list(result.scalars().all())
+
+
+async def get_all_processing_jobs(session: AsyncSession) -> list[TranscriptionJob]:
+    """Get all jobs currently in 'processing' state.
+
+    Used for active polling when webhooks are not configured.
+
+    Args:
+        session: Database session
+
+    Returns:
+        List of all processing jobs
+    """
+    result = await session.execute(
+        select(TranscriptionJob)
+        .where(TranscriptionJob.status == JobStatus.PROCESSING.value)
+        .where(TranscriptionJob.assemblyai_id.isnot(None))
+    )
+    return list(result.scalars().all())

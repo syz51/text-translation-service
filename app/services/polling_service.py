@@ -79,10 +79,14 @@ class PollingService:
                 await asyncio.sleep(1)
 
     async def _poll_stale_jobs(self) -> None:
-        """Poll for stale jobs and trigger recovery.
+        """Poll for jobs and trigger completion processing.
+
+        Strategy:
+        - If webhooks configured: Only check stale jobs (failsafe recovery)
+        - If no webhooks: Actively poll ALL processing jobs (primary completion mechanism)
 
         Note on race conditions: It's safe if a webhook arrives between fetching
-        stale jobs and processing them. The idempotency check in
+        jobs and processing them. The idempotency check in
         process_completed_transcription() handles this - whichever path (webhook
         or polling) gets there first will process the job, and the second will
         skip it. This is intentional design, not a bug.
@@ -90,23 +94,39 @@ class PollingService:
         settings = self._settings if self._settings is not None else get_settings()
         async with SessionLocal() as session:
             try:
-                # Get stale jobs
-                stale_jobs = await crud.get_stale_processing_jobs(
-                    session, settings.stale_job_threshold
+                # Determine polling strategy based on webhook configuration
+                webhook_configured = bool(
+                    settings.webhook_base_url and settings.webhook_secret_token
                 )
 
-                if not stale_jobs:
-                    logger.debug("No stale jobs found")
+                if webhook_configured:
+                    # Stale recovery mode: Only check old jobs (webhooks handle recent ones)
+                    jobs = await crud.get_stale_processing_jobs(
+                        session, settings.stale_job_threshold
+                    )
+                    if jobs:
+                        logger.warning(
+                            "Found %d stale job(s) beyond %ds threshold (webhook recovery)",
+                            len(jobs),
+                            settings.stale_job_threshold,
+                        )
+                    else:
+                        logger.debug("No stale jobs found (webhook mode)")
+                else:
+                    # Active polling mode: Check ALL processing jobs (no webhooks)
+                    jobs = await crud.get_all_processing_jobs(session)
+                    if jobs:
+                        logger.info(
+                            "Found %d processing job(s) to check (active polling mode)", len(jobs)
+                        )
+                    else:
+                        logger.debug("No processing jobs found (active polling mode)")
+
+                if not jobs:
                     return
 
-                logger.warning(
-                    "Found %d stale job(s) beyond %ds threshold",
-                    len(stale_jobs),
-                    settings.stale_job_threshold,
-                )
-
-                # Process each stale job
-                for job in stale_jobs:
+                # Process each job
+                for job in jobs:
                     try:
                         # Should always have assemblyai_id due to query filter, but check for safety
                         if not job.assemblyai_id:
@@ -114,7 +134,7 @@ class PollingService:
                             continue
 
                         logger.info(
-                            "Recovering stale job %s (AssemblyAI: %s, age: %s)",
+                            "Checking job %s (AssemblyAI: %s, created: %s)",
                             job.id,
                             job.assemblyai_id,
                             job.created_at,
@@ -126,13 +146,13 @@ class PollingService:
                                 job_session, job.id, job.assemblyai_id, settings=settings
                             )
 
-                        logger.info("Successfully recovered stale job %s", job.id)
+                        logger.info("Successfully processed job %s", job.id)
 
                     except Exception as e:
-                        logger.error("Failed to recover stale job %s: %s", job.id, e, exc_info=True)
+                        logger.error("Failed to process job %s: %s", job.id, e, exc_info=True)
 
             except Exception as e:
-                logger.error("Error querying stale jobs: %s", e, exc_info=True)
+                logger.error("Error querying jobs: %s", e, exc_info=True)
 
 
 # Global instance

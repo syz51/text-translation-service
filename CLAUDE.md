@@ -134,7 +134,9 @@ Key files:
 
 **Important**: The transcription API requires S3 configuration and webhook setup. The service initializes S3 client during startup but allows the app to start even if S3 fails.
 
-**Webhook + Polling Strategy**: Webhooks provide low latency, polling ensures reliability. Jobs stuck in `processing` beyond threshold (default: 2h) are auto-recovered.
+**Webhook + Polling Strategy**:
+- **With webhooks**: Webhooks provide low latency (~5 mins), polling recovers stale jobs (2h+ old) as failsafe
+- **Without webhooks**: Active polling checks ALL processing jobs every 5 mins (primary completion mechanism)
 
 ### Database Layer
 

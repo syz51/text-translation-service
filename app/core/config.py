@@ -72,7 +72,7 @@ class Settings(BaseSettings):
 
     # Polling/Recovery Configuration
     polling_enabled: bool = True  # Enable background polling for stale jobs
-    polling_interval: int = 300  # 5 minutes in seconds
+    polling_interval: int = 10  # 5 minutes in seconds
     stale_job_threshold: int = 7200  # 2 hours in seconds
 
     # Logging

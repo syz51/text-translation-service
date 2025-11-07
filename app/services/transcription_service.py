@@ -152,7 +152,7 @@ async def process_completed_transcription(
             await crud.update_job_result(
                 session, job_id, srt_s3_key, completed_at=datetime.now(UTC)
             )
-            await session.commit()
+            # Note: update_job_result already commits, no need for additional commit
 
             logger.info("Successfully processed transcription for job %s", job_id)
             return

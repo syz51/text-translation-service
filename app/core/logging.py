@@ -42,6 +42,11 @@ def setup_logging() -> None:
         handlers=handlers,
     )
 
+    # Silence noisy SQLAlchemy logs
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
+
 
 def get_logger(name: str) -> logging.Logger:
     """Get logger instance for module."""

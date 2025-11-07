@@ -62,8 +62,31 @@ async def test_polling_service_disabled(polling_service):
 
 @pytest.mark.asyncio
 async def test_poll_stale_jobs_no_jobs(polling_service):
-    """Test polling when no stale jobs exist."""
-    with patch("app.services.polling_service.crud.get_stale_processing_jobs") as mock_get:
+    """Test polling when no jobs exist (webhook mode)."""
+    mock_settings = Settings(
+        webhook_base_url="https://example.com",
+        webhook_secret_token="secret",
+    )
+    with (
+        patch("app.services.polling_service.get_settings", return_value=mock_settings),
+        patch("app.services.polling_service.crud.get_stale_processing_jobs") as mock_get,
+    ):
+        mock_get.return_value = []
+        await polling_service._poll_stale_jobs()
+        mock_get.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_poll_active_jobs_no_jobs(polling_service):
+    """Test polling when no jobs exist (active polling mode without webhooks)."""
+    mock_settings = Settings(
+        webhook_base_url=None,
+        webhook_secret_token=None,
+    )
+    with (
+        patch("app.services.polling_service.get_settings", return_value=mock_settings),
+        patch("app.services.polling_service.crud.get_all_processing_jobs") as mock_get,
+    ):
         mock_get.return_value = []
         await polling_service._poll_stale_jobs()
         mock_get.assert_called_once()
@@ -71,11 +94,44 @@ async def test_poll_stale_jobs_no_jobs(polling_service):
 
 @pytest.mark.asyncio
 async def test_poll_stale_jobs_recovery(polling_service, stale_job):
-    """Test polling recovers stale jobs."""
+    """Test polling recovers stale jobs (webhook mode)."""
     mock_process = AsyncMock()
+    mock_settings = Settings(
+        webhook_base_url="https://example.com",
+        webhook_secret_token="secret",
+    )
 
     with (
+        patch("app.services.polling_service.get_settings", return_value=mock_settings),
         patch("app.services.polling_service.crud.get_stale_processing_jobs") as mock_get,
+        patch(
+            "app.services.polling_service.process_completed_transcription", mock_process
+        ) as mock_process,
+    ):
+        mock_get.return_value = [stale_job]
+
+        await polling_service._poll_stale_jobs()
+
+        mock_get.assert_called_once()
+        mock_process.assert_called_once()
+        # Verify it was called with correct job_id and assemblyai_id
+        call_args = mock_process.call_args
+        assert call_args[0][1] == stale_job.id  # job_id
+        assert call_args[0][2] == stale_job.assemblyai_id  # assemblyai_id
+
+
+@pytest.mark.asyncio
+async def test_poll_active_jobs_recovery(polling_service, stale_job):
+    """Test active polling recovers jobs (no webhook mode)."""
+    mock_process = AsyncMock()
+    mock_settings = Settings(
+        webhook_base_url=None,
+        webhook_secret_token=None,
+    )
+
+    with (
+        patch("app.services.polling_service.get_settings", return_value=mock_settings),
+        patch("app.services.polling_service.crud.get_all_processing_jobs") as mock_get,
         patch(
             "app.services.polling_service.process_completed_transcription", mock_process
         ) as mock_process,
@@ -96,8 +152,13 @@ async def test_poll_stale_jobs_recovery(polling_service, stale_job):
 async def test_poll_stale_jobs_error_handling(polling_service, stale_job):
     """Test polling handles errors gracefully."""
     mock_process = AsyncMock(side_effect=Exception("Test error"))
+    mock_settings = Settings(
+        webhook_base_url="https://example.com",
+        webhook_secret_token="secret",
+    )
 
     with (
+        patch("app.services.polling_service.get_settings", return_value=mock_settings),
         patch("app.services.polling_service.crud.get_stale_processing_jobs") as mock_get,
         patch(
             "app.services.polling_service.process_completed_transcription", mock_process
@@ -126,8 +187,13 @@ async def test_poll_stale_jobs_multiple_jobs(polling_service, stale_job):
     )
 
     mock_process = AsyncMock()
+    mock_settings = Settings(
+        webhook_base_url="https://example.com",
+        webhook_secret_token="secret",
+    )
 
     with (
+        patch("app.services.polling_service.get_settings", return_value=mock_settings),
         patch("app.services.polling_service.crud.get_stale_processing_jobs") as mock_get,
         patch(
             "app.services.polling_service.process_completed_transcription", mock_process
