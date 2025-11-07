@@ -63,13 +63,23 @@ class PollingService:
                 logger.error("Error in polling iteration: %s", e, exc_info=True)
 
             # Sleep with interruptible checks every second
+            # Note: This simple loop is intentional and optimal for graceful shutdown.
+            # Checking _should_stop every 1s allows fast shutdown response without
+            # complex asyncio.Event() machinery. Alternative approaches don't improve this.
             for _ in range(settings.polling_interval):
                 if self._should_stop:
                     break
                 await asyncio.sleep(1)
 
     async def _poll_stale_jobs(self) -> None:
-        """Poll for stale jobs and trigger recovery."""
+        """Poll for stale jobs and trigger recovery.
+
+        Note on race conditions: It's safe if a webhook arrives between fetching
+        stale jobs and processing them. The idempotency check in
+        process_completed_transcription() handles this - whichever path (webhook
+        or polling) gets there first will process the job, and the second will
+        skip it. This is intentional design, not a bug.
+        """
         async with SessionLocal() as session:
             try:
                 # Get stale jobs
