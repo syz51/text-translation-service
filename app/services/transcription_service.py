@@ -36,8 +36,10 @@ async def process_completed_transcription(
 ) -> None:
     """Process completed transcription with retry logic.
 
-    This function is called after webhook ACK. It fetches the transcript,
-    converts to SRT, uploads to S3, and updates the database.
+    This function is called after webhook ACK or by polling service.
+    It fetches the transcript, converts to SRT, uploads to S3, and updates the database.
+
+    Idempotent: Safe to call multiple times. If job already completed, returns early.
 
     Args:
         session: Database session
@@ -57,6 +59,13 @@ async def process_completed_transcription(
     job = await crud.get_job(session, job_id)
     if not job:
         logger.error("Job %s not found", job_id)
+        return
+
+    # Idempotency check: If already completed/error, skip processing
+    if job.status in (JobStatus.COMPLETED.value, JobStatus.ERROR.value):
+        logger.info(
+            "Job %s already in terminal state (%s), skipping processing", job_id, job.status
+        )
         return
 
     while job.retry_count < max_attempts:

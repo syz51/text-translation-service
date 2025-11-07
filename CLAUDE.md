@@ -115,6 +115,7 @@ The transcription service integrates with AssemblyAI for audio-to-SRT conversion
 
 - **Async Workflow**: Upload → DB record → S3 storage → AssemblyAI → Webhook → Background processing
 - **Webhook Pattern**: AssemblyAI sends completion notification to `/webhooks/assemblyai/{secret_token}`
+- **Polling Fallback**: Background polling recovers jobs if webhooks fail (configurable interval/threshold)
 - **Background Tasks**: Transcription processing happens in background to return 200 OK within 10s
 - **Presigned URLs**: S3 presigned URLs for audio upload (24h expiry) and SRT download (1h expiry)
 - **Retry Logic**: Exponential backoff with configurable retry attempts
@@ -124,11 +125,14 @@ Key files:
 
 - `app/api/v1/transcription.py`: Transcription endpoints and webhook handler
 - `app/services/assemblyai_client.py`: AssemblyAI API client wrapper
-- `app/services/transcription_service.py`: Transcription processing logic
+- `app/services/transcription_service.py`: Transcription processing logic (idempotent)
+- `app/services/polling_service.py`: Background polling for stale job recovery
 - `app/db/models.py`: Job status tracking (QUEUED → PROCESSING → COMPLETED/ERROR)
 - `app/storage/s3.py`: S3 wrapper with connection pooling
 
 **Important**: The transcription API requires S3 configuration and webhook setup. The service initializes S3 client during startup but allows the app to start even if S3 fails.
+
+**Webhook + Polling Strategy**: Webhooks provide low latency, polling ensures reliability. Jobs stuck in `processing` beyond threshold (default: 2h) are auto-recovered.
 
 ### Database Layer
 
@@ -202,6 +206,7 @@ All configuration via environment variables (see `.env.example`):
 - **Optional Database**: `DATABASE_PATH` (default: ./data/transcriptions.db)
 - **Optional S3**: `S3_BUCKET_NAME`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, etc.
 - **Optional Transcription**: `ASSEMBLYAI_API_KEY`, `WEBHOOK_BASE_URL`, `WEBHOOK_SECRET_TOKEN`
+- **Optional Polling**: `POLLING_ENABLED` (default: true), `POLLING_INTERVAL` (default: 300s), `STALE_JOB_THRESHOLD` (default: 7200s)
 - **Optional Server**: `HOST`, `PORT`, `ENVIRONMENT`, `ALLOWED_HOSTS`
 - **Optional Auth**: `API_KEY` (enables authentication if set)
 
@@ -219,6 +224,8 @@ All configuration via environment variables (see `.env.example`):
 
 6. **Job Status Race Conditions**: Update job status to PROCESSING BEFORE starting AssemblyAI to prevent webhook race conditions.
 
+7. **Polling Service**: `process_completed_transcription()` is idempotent - safe to call multiple times (checks job status first). Polling recovers stale jobs automatically.
+
 ## Project Structure
 
 ```
@@ -228,6 +235,6 @@ app/
 ├── db/              # Database models, CRUD, session management
 ├── models/          # Data models (SRT entries)
 ├── schemas/         # Pydantic request/response models
-├── services/        # Business logic (translation, transcription, parsing)
+├── services/        # Business logic (translation, transcription, polling, parsing)
 └── storage/         # S3 wrapper with connection pooling
 ```

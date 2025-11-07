@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     cors_allow_headers: list[str] = ["*"]
 
     # Google GenAI Configuration
-    google_api_key: str
+    google_api_key: str | None = None
     default_model: str = "gemini-2.5-pro"
 
     # Translation Configuration
@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     retry_backoff: list[int] = [1, 5, 15]  # seconds
     webhook_timeout: int = 10  # seconds
     allowed_audio_formats: set[str] = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm"}
+
+    # Polling/Recovery Configuration
+    polling_enabled: bool = True  # Enable background polling for stale jobs
+    polling_interval: int = 300  # 5 minutes in seconds
+    stale_job_threshold: int = 7200  # 2 hours in seconds
 
     # Logging
     log_level: str = "INFO"

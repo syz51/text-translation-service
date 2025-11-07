@@ -11,6 +11,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.middleware import setup_middleware
+from app.services.polling_service import polling_service
 from app.storage.s3 import s3_storage
 
 # Setup logging
@@ -60,12 +61,25 @@ async def lifespan(app: FastAPI):
         # Don't raise - allow app to start even if S3 fails
         logger.warning("Application starting without S3 connectivity")
 
+    # Start polling service for stale job recovery
+    try:
+        await polling_service.start()
+    except Exception as e:
+        logger.error("Failed to start polling service: %s", e)
+        # Don't raise - allow app to start even if polling fails
+
     logger.info("Application startup complete")
 
     yield
 
     # Shutdown
     logger.info("Application shutdown: Cleaning up resources")
+
+    # Stop polling service
+    try:
+        await polling_service.stop()
+    except Exception as e:
+        logger.error("Error stopping polling service: %s", e)
 
     # Close S3 client
     try:

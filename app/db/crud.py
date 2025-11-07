@@ -1,6 +1,6 @@
 """CRUD operations for transcription jobs."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -172,3 +172,25 @@ async def count_active_jobs(session: AsyncSession) -> int:
         )
     )
     return result.scalar_one()
+
+
+async def get_stale_processing_jobs(
+    session: AsyncSession, stale_threshold_seconds: int
+) -> list[TranscriptionJob]:
+    """Get jobs stuck in 'processing' state beyond threshold.
+
+    Args:
+        session: Database session
+        stale_threshold_seconds: Threshold in seconds
+
+    Returns:
+        List of stale jobs
+    """
+    threshold = datetime.now(UTC) - timedelta(seconds=stale_threshold_seconds)
+    result = await session.execute(
+        select(TranscriptionJob)
+        .where(TranscriptionJob.status == JobStatus.PROCESSING.value)
+        .where(TranscriptionJob.created_at < threshold)
+        .where(TranscriptionJob.assemblyai_id.isnot(None))
+    )
+    return list(result.scalars().all())
