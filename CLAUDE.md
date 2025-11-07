@@ -29,10 +29,12 @@ cp .env.example .env
 uv run uvicorn app.main:app --reload
 
 # Development mode (Docker)
-docker compose -f docker-compose.dev.yml up --build
+docker build -t text-translation-service .
+docker run -p 8000:8000 --env-file .env text-translation-service
 
 # Production mode (Docker)
-docker compose up -d
+docker build -t text-translation-service .
+docker run -d -p 8000:8000 --env-file .env text-translation-service
 
 # Production mode (local)
 python -m app.main
@@ -109,7 +111,7 @@ Key files:
 - `app/services/srt_parser.py`: SRT parsing/reconstruction utilities
 - `app/api/v1/translation.py`: Translation endpoint
 
-### Transcription Service Architecture (In Development)
+### Transcription Service Architecture
 
 The transcription service integrates with AssemblyAI for audio-to-SRT conversion:
 
@@ -186,15 +188,43 @@ All endpoints are prefixed with `/api/v1/`:
 - Log levels configurable via `LOG_LEVEL` env var
 - Key events logged: chunk progress, S3 operations, job state changes, webhook events
 
+**Log Security** (`app/core/log_filter.py`):
+- `SensitiveDataFilter` automatically redacts sensitive data from all logs
+- Configurable via `ENABLE_LOG_REDACTION` (default: true)
+- Redacts: API keys, tokens, S3 URLs, webhook secrets, passwords
+- Uses regex patterns to detect and replace sensitive data with `[REDACTED]`
+- Applied to all log records before emission
+
 ### Testing Patterns
 
-Test fixtures in `tests/conftest.py`:
+**Test Organization**:
+- 213 tests across 20 test files organized by component
+- Tests mirror app structure: `tests/api/`, `tests/services/`, `tests/core/`, etc.
+- See `tests/README.md` for comprehensive testing guide
 
+**Test Fixtures** (`tests/conftest.py`):
+
+*FastAPI Test Clients:*
 - `client`: Test client without auth
 - `client_with_auth`: Test client with API key
+
+*Translation Fixtures:*
 - `mock_genai_client`: Mock Google GenAI client
 - `create_genai_response()`: Helper to create mock API responses
-- `create_async_mock()`: Helper for async function mocking
+
+*Transcription Fixtures:*
+- `fake_assemblyai_client`: Test double for AssemblyAI API (returns predictable responses)
+- `fake_s3_storage`: Test double for S3 operations (in-memory storage)
+- `mock_transcription_services`: Mocked transcription service dependencies
+
+*Database Fixtures:*
+- `db_session`: Async database session for tests
+- `init_test_db`: Initialize test database schema
+
+*Test Doubles Pattern*:
+- `FakeAssemblyAIClient`: In-memory implementation of AssemblyAI client
+- `FakeS3Storage`: In-memory implementation of S3 storage
+- Provides predictable behavior without external dependencies
 
 **Important**: When mocking, patch where the function is IMPORTED, not where it's DEFINED (see `get_mock_target()` helper).
 
@@ -231,7 +261,7 @@ All configuration via environment variables (see `.env.example`):
 ```
 app/
 ├── api/v1/          # API endpoints (health, translation, transcription)
-├── core/            # Config, logging, middleware, security
+├── core/            # Config, logging, log_filter (security), middleware, security
 ├── db/              # Database models, CRUD, session management
 ├── models/          # Data models (SRT entries)
 ├── schemas/         # Pydantic request/response models

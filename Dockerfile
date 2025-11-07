@@ -35,6 +35,10 @@ COPY --from=builder --chown=app:app /app /app
 # Copy application code
 COPY --chown=app:app ./app /app/app
 
+# Copy alembic files for migrations
+COPY --chown=app:app ./alembic.ini /app/alembic.ini
+COPY --chown=app:app ./alembic /app/alembic
+
 WORKDIR /app
 
 # Expose port
@@ -42,7 +46,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5.0)"
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/api/v1/health', timeout=5.0)"
 
 # Run the application
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,6 +1,6 @@
 # Text Translation Service
 
-Production-grade FastAPI service for translating SRT subtitle files using Google GenAI's Gemini 2.5 Pro model, with transcription API capabilities (in development).
+Production-grade FastAPI service for translating SRT subtitle files using Google GenAI's Gemini 2.5 Pro model, with production-ready transcription API for audio-to-SRT conversion.
 
 ## Features
 
@@ -13,11 +13,23 @@ Production-grade FastAPI service for translating SRT subtitle files using Google
 - **Concurrent Processing**: Handles multiple chunks simultaneously for speed
 - **Google GenAI Integration**: Uses Gemini 2.5 Pro with extended thinking
 
+### Transcription Service
+
+- **Audio-to-SRT Conversion**: AssemblyAI integration for high-quality transcription
+- **Webhook + Polling Hybrid**: Low-latency webhooks with fallback polling for reliability
+- **S3 Storage**: Presigned URLs for secure audio upload and SRT download
+- **Background Processing**: Async job processing with status tracking
+- **Automatic Recovery**: Polling service recovers stale jobs if webhooks fail
+- **Concurrent Job Limits**: Configurable limits to prevent resource exhaustion
+
 ### Infrastructure
 
 - **Database Layer**: SQLAlchemy 2.0 with async support and Alembic migrations
 - **S3 Storage**: Production-grade S3 wrapper with connection pooling for audio/SRT files
 - **API Key Authentication**: Optional authentication layer
+- **Log Security**: Automatic redaction of sensitive data (API keys, tokens, S3 URLs)
+- **Background Polling**: Configurable polling for stale job recovery
+- **Health Checks**: Component status monitoring (database, S3, services)
 - **Auto Documentation**: Interactive API docs at `/docs`
 - **Production Ready**: Proper project structure, logging, config management, CORS, middleware, and tests
 - **API Versioning**: Clean v1 API structure with room for future versions
@@ -28,37 +40,43 @@ Production-grade FastAPI service for translating SRT subtitle files using Google
 text-translation-service/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py                 # FastAPI app factory
+│   ├── main.py                      # FastAPI app factory
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── v1/                 # API v1 routes
+│   │   └── v1/                      # API v1 routes
 │   │       ├── __init__.py
-│   │       ├── health.py       # Health check endpoints
-│   │       └── translation.py  # Translation endpoints
+│   │       ├── health.py            # Health check endpoints
+│   │       ├── transcription.py     # Transcription endpoints + webhooks
+│   │       └── translation.py       # Translation endpoints
 │   ├── core/
 │   │   ├── __init__.py
-│   │   ├── config.py           # Settings management
-│   │   ├── logging.py          # Logging setup
-│   │   ├── middleware.py       # Middleware configuration
-│   │   └── security.py         # Auth middleware
+│   │   ├── config.py                # Settings management
+│   │   ├── log_filter.py            # Sensitive data redaction
+│   │   ├── logging.py               # Logging setup
+│   │   ├── middleware.py            # Middleware configuration
+│   │   └── security.py              # Auth middleware
 │   ├── db/
 │   │   ├── __init__.py
-│   │   ├── base.py             # SQLAlchemy setup
-│   │   ├── crud.py             # Database operations
-│   │   └── models.py           # Database models
+│   │   ├── base.py                  # SQLAlchemy setup
+│   │   ├── crud.py                  # Database operations
+│   │   └── models.py                # Database models
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── srt.py              # SRT data models
+│   │   └── srt.py                   # SRT data models
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   └── translation.py      # Request/response schemas
+│   │   ├── transcription.py         # Transcription schemas
+│   │   └── translation.py           # Translation schemas
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── srt_parser.py       # SRT parsing logic
-│   │   └── translation.py      # Translation service
+│   │   ├── assemblyai_client.py     # AssemblyAI API wrapper
+│   │   ├── polling_service.py       # Background job recovery
+│   │   ├── srt_parser.py            # SRT parsing logic
+│   │   ├── transcription_service.py # Transcription processing
+│   │   └── translation.py           # Translation service
 │   └── storage/
 │       ├── __init__.py
-│       └── s3.py               # S3 storage wrapper
+│       └── s3.py                    # S3 storage wrapper
 ├── alembic/
 │   ├── versions/               # Database migrations
 │   ├── env.py                  # Alembic environment
@@ -73,14 +91,31 @@ text-translation-service/
 │   └── lint.sh                 # Code linting
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py             # Test fixtures
-│   ├── test_api.py             # API tests
-│   └── test_srt_parser.py      # Parser tests
+│   ├── conftest.py                        # Shared test fixtures
+│   ├── README.md                          # Testing guide
+│   ├── api/
+│   │   └── v1/
+│   │       ├── test_health.py             # Health endpoint tests
+│   │       ├── test_transcription.py      # Transcription API tests
+│   │       └── test_translation.py        # Translation API tests
+│   ├── core/
+│   │   ├── test_config.py                 # Config tests
+│   │   ├── test_log_filter.py             # Log redaction tests
+│   │   └── test_security.py               # Auth middleware tests
+│   ├── db/
+│   │   ├── test_crud.py                   # CRUD tests
+│   │   └── test_models.py                 # Model tests
+│   ├── services/
+│   │   ├── test_assemblyai_client.py      # AssemblyAI client tests
+│   │   ├── test_polling_service.py        # Polling service tests
+│   │   ├── test_srt_parser.py             # Parser tests
+│   │   ├── test_transcription_service.py  # Transcription logic tests
+│   │   └── test_translation.py            # Translation logic tests
+│   └── storage/
+│       └── test_s3.py                     # S3 storage tests
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
-├── docker-compose.yml          # Production compose
-├── docker-compose.dev.yml      # Development compose
 ├── Dockerfile
 ├── pyproject.toml
 ├── uv.lock
@@ -93,7 +128,7 @@ text-translation-service/
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- Docker & Docker Compose (optional)
+- Docker (optional)
 
 ### Installation
 
@@ -147,7 +182,7 @@ alembic history
 
 ## Running
 
-### Development Mode (Local)
+### Development Mode
 
 Using uv:
 
@@ -161,22 +196,26 @@ Using Python directly:
 python -m uvicorn app.main:app --reload
 ```
 
-### Development Mode (Docker)
+Using Docker:
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker build -t text-translation-service .
+docker run -p 8000:8000 --env-file .env text-translation-service
 ```
 
-### Production Mode (Docker)
+### Production Mode
 
-```bash
-docker compose up -d
-```
-
-### Production Mode (Local)
+Using Python:
 
 ```bash
 python -m app.main
+```
+
+Using Docker:
+
+```bash
+docker build -t text-translation-service .
+docker run -d -p 8000:8000 --env-file .env text-translation-service
 ```
 
 Server runs at `http://localhost:8000`
@@ -248,6 +287,69 @@ curl -X POST http://localhost:8000/api/v1/translate \
 }
 ```
 
+### Transcribe Audio File
+
+**1. Create transcription job:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/transcriptions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "audio_url": "https://example.com/audio.mp3",
+    "language_code": "en"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "queued",
+  "audio_url": "https://example.com/audio.mp3",
+  "language_code": "en",
+  "created_at": "2025-01-15T10:30:00Z"
+}
+```
+
+**2. Check job status:**
+
+```bash
+curl http://localhost:8000/api/v1/transcriptions/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Response:**
+
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "audio_url": "https://example.com/audio.mp3",
+  "language_code": "en",
+  "created_at": "2025-01-15T10:30:00Z",
+  "completed_at": "2025-01-15T10:32:30Z"
+}
+```
+
+**3. Download SRT file:**
+
+```bash
+curl -L http://localhost:8000/api/v1/transcriptions/550e8400-e29b-41d4-a716-446655440000/srt \
+  -o transcript.srt
+```
+
+**Request parameters:**
+
+- `audio_url` (required): URL to audio file (or use S3 presigned URL from upload)
+- `language_code` (optional): Language code for transcription (e.g., "en", "es", "fr")
+
+**Job statuses:**
+
+- `queued`: Job created, waiting to start
+- `processing`: Transcription in progress
+- `completed`: SRT file ready for download
+- `failed`: Transcription failed (check error message)
+
 ## Interactive Documentation
 
 - **Swagger UI**: `http://localhost:8000/docs`
@@ -256,21 +358,29 @@ curl -X POST http://localhost:8000/api/v1/translate \
 
 ## Testing
 
-Run tests:
+The project has 213 tests across 20 test files organized by component (API, services, core, database, storage).
+
+**Quick start:**
 
 ```bash
-# Using uv
+# Run all tests
 uv run pytest
 
-# Using pytest directly
-pytest
+# With coverage
+uv run pytest --cov=app --cov-report=html
 
-# With coverage (using script)
+# Run specific test file
+uv run pytest tests/api/v1/test_transcription.py
+
+# Using test script
 bash scripts/test.sh
-
-# With coverage (manual)
-pytest --cov=app --cov-report=html
 ```
+
+**See [tests/README.md](tests/README.md) for comprehensive testing guide** covering:
+- Test organization and structure
+- Fixtures and test doubles (FakeAssemblyAIClient, FakeS3Storage)
+- Running specific test suites
+- Coverage analysis
 
 ## Development
 
@@ -322,7 +432,7 @@ All configuration is managed through environment variables (see `.env.example`):
 - `S3_CONNECT_TIMEOUT`: Connection timeout in seconds (default: 60)
 - `S3_READ_TIMEOUT`: Read timeout in seconds (default: 60)
 
-### Optional - Transcription (Future)
+### Optional - Transcription
 
 - `ASSEMBLYAI_API_KEY`: AssemblyAI API key for transcription service
 - `WEBHOOK_BASE_URL`: Base URL for webhook callbacks
@@ -363,14 +473,26 @@ All configuration is managed through environment variables (see `.env.example`):
 ### Optional - Logging
 
 - `LOG_LEVEL`: Logging level (default: INFO)
+- `ENABLE_LOG_REDACTION`: Enable automatic redaction of sensitive data in logs (default: true)
+  - Redacts: API keys, tokens, S3 URLs, webhook secrets, passwords
 
 ## Error Handling
+
+### Translation Errors
 
 - **400 Bad Request**: Invalid SRT format
 - **401 Unauthorized**: Missing/invalid API key (if auth enabled)
 - **422 Unprocessable Entity**: Invalid request parameters
 - **502 Bad Gateway**: Google GenAI API error
 - **500 Internal Server Error**: Unexpected error
+
+### Transcription Errors
+
+- **400 Bad Request**: Invalid audio format or SRT not ready yet
+- **404 Not Found**: Job ID not found
+- **413 Payload Too Large**: Audio file exceeds size limit
+- **429 Too Many Requests**: Concurrent job limit reached
+- **500 Internal Server Error**: Transcription processing error
 
 ## Architecture
 
@@ -415,14 +537,18 @@ All configuration is managed through environment variables (see `.env.example`):
 ### Docker Deployment
 
 ```bash
-# Build and run
-docker compose up -d
+# Build image
+docker build -t text-translation-service .
+
+# Run container
+docker run -d -p 8000:8000 --env-file .env --name translation-service text-translation-service
 
 # View logs
-docker compose logs -f
+docker logs -f translation-service
 
-# Stop
-docker compose down
+# Stop container
+docker stop translation-service
+docker rm translation-service
 ```
 
 ### Health Checks
