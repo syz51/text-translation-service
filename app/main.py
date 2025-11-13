@@ -2,7 +2,6 @@
 
 from contextlib import asynccontextmanager
 import logging
-from pathlib import Path
 import subprocess
 
 from fastapi import FastAPI
@@ -25,11 +24,6 @@ async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
     logger.info("Application startup: Initializing services")
-
-    # Create data directory if it doesn't exist
-    data_dir = Path("./data")
-    data_dir.mkdir(exist_ok=True)
-    logger.info("Data directory ready: %s", data_dir.absolute())
 
     # Run Alembic migrations
     try:
