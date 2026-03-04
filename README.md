@@ -36,7 +36,7 @@ Production-grade FastAPI service for translating SRT subtitle files using Google
 
 ## Project Structure
 
-```
+```text
 text-translation-service/
 ├── app/
 │   ├── __init__.py

@@ -135,6 +135,7 @@ Key files:
 **Important**: The transcription API requires S3 configuration and webhook setup. The service initializes S3 client during startup but allows the app to start even if S3 fails.
 
 **Webhook + Polling Strategy**:
+
 - **With webhooks**: Webhooks provide low latency (~5 mins), polling recovers stale jobs (2h+ old) as failsafe
 - **Without webhooks**: Active polling checks ALL processing jobs every 5 mins (primary completion mechanism)
 
@@ -255,6 +256,7 @@ All configuration via environment variables (see `.env.example`):
 **Pattern**: Uses FastAPI's recommended DI pattern with `@lru_cache` for singleton settings (`app/core/config.py`).
 
 **In Endpoints** (use FastAPI's `Depends`):
+
 ```python
 from typing import Annotated
 from fastapi import Depends
@@ -267,7 +269,9 @@ async def my_endpoint(
 ```
 
 **In Services** (two patterns):
+
 1. **Accept optional settings param** (better testability):
+
    ```python
    def my_service_function(settings: Settings | None = None):
        if settings is None:
@@ -276,6 +280,7 @@ async def my_endpoint(
    ```
 
 2. **Call get_settings() directly** (simpler):
+
    ```python
    from app.core.config import get_settings
 
@@ -285,6 +290,7 @@ async def my_endpoint(
    ```
 
 **In Tests**:
+
 ```python
 from app.core.config import Settings
 
@@ -317,7 +323,7 @@ result = await my_service(settings=test_settings)
 
 ## Project Structure
 
-```
+```text
 app/
 ├── api/v1/          # API endpoints (health, translation, transcription)
 ├── core/            # Config, logging, log_filter (security), middleware, security

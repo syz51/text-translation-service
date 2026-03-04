@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # Google GenAI Configuration
     google_api_key: str | None = None
-    default_model: str = "gemini-2.5-pro"
+    default_model: str = "gemini-3.1-flash-lite-preview"
 
     # Translation Configuration
     default_chunk_size: int = 100

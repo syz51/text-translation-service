@@ -5,19 +5,19 @@ description = "SRT translation service using Google GenAI (Gemini 2.5 Pro)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-	"fastapi>=0.121.0",
-	"uvicorn[standard]>=0.38.0",
+	"fastapi>=0.135.1",
+	"uvicorn[standard]>=0.41.0",
 	"httpx>=0.28.1",
 	"pydantic>=2.12.4",
-	"pydantic-settings>=2.11.0",
-	"python-dotenv>=1.2.1",
+	"pydantic-settings>=2.13.1",
+	"python-dotenv>=1.2.2",
 	"pysubs2>=1.8.0",
-	"google-genai>=1.49.0",
-	"assemblyai>=0.46.0",
-	"sqlalchemy>=2.0.44",
+	"google-genai>=1.65.0",
+	"assemblyai>=0.54.0",
+	"sqlalchemy[asyncio]>=2.0.48",
 	"aiosqlite>=0.21.0",
-	"alembic>=1.17.1",
-	"python-multipart>=0.0.20",
+	"alembic>=1.18.4",
+	"python-multipart>=0.0.22",
 	"aioboto3>=15.5.0",
 ]
 
@@ -26,9 +26,9 @@ dev = [
 	"pytest>=8.4.2",
 	"pytest-asyncio>=1.2.0",
 	"pytest-cov>=7.0.0",
-	"pytest-env>=1.2.0",
-	"black>=25.9.0",
-	"ruff>=0.14.4",
+	"pytest-env>=1.5.0",
+	"black>=26.1.0",
+	"ruff>=0.15.4",
 ]
 
 [tool.pytest.ini_options]
