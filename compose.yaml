@@ -1,0 +1,19 @@
+services:
+  text-translation-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: text-translation-service
+    env_file:
+      - .env
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-1}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-northeast-1}
+      AWS_SDK_LOAD_CONFIG: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ${HOME}/.aws:/home/app/.aws:ro
+    restart: unless-stopped

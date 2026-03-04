@@ -71,14 +71,19 @@ class S3Storage:
             True if initialization successful, False otherwise
         """
         try:
+            client_kwargs = {
+                "endpoint_url": self.endpoint_url,
+                "region_name": self.region,
+                "config": self.config,
+            }
+            if self.access_key and self.secret_key:
+                client_kwargs["aws_access_key_id"] = self.access_key
+                client_kwargs["aws_secret_access_key"] = self.secret_key
+
             # Create long-lived client with connection pooling
             self._client_context = self.session.client(
                 "s3",
-                endpoint_url=self.endpoint_url,
-                region_name=self.region,
-                aws_access_key_id=self.access_key,
-                aws_secret_access_key=self.secret_key,
-                config=self.config,
+                **client_kwargs,
             )
             self._client = await self._client_context.__aenter__()
 
